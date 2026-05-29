@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
-import { Plus, Edit2, Check, XCircle, CreditCard, Users, Search, RefreshCw } from 'lucide-react'
+import { Plus, Edit2, Check, XCircle, CreditCard, Users, Search, RefreshCw, Star } from 'lucide-react'
 
 interface Plan {
   id: string
@@ -234,14 +234,6 @@ export default function SubscriptionsPage() {
     t.slug.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const subscriptionStatusColors = {
-    active: 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30',
-    trialing: 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30',
-    past_due: 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30',
-    canceled: 'bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700',
-    unpaid: 'bg-red-50 text-red-700 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30',
-  }
-
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -309,54 +301,70 @@ export default function SubscriptionsPage() {
             </div>
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {plans.map((plan) => (
-                <div
-                  key={plan.id}
-                  className="bg-white dark:bg-card-custom border border-border-custom rounded-xl p-6 flex flex-col justify-between shadow-xs"
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">{plan.name}</h3>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-primary-light text-primary">
-                        /{plan.slug}
-                      </span>
-                    </div>
+              {plans.map((plan) => {
+                const isPro = plan.slug === 'pro'
+                return (
+                  <div
+                    key={plan.id}
+                    className={`bg-white dark:bg-card-custom border ${
+                      isPro 
+                        ? 'ring-2 ring-primary border-transparent dark:ring-primary dark:border-transparent scale-102 z-10 shadow-md' 
+                        : 'border-border-custom'
+                    } rounded-xl p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-lg`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">{plan.name}</h3>
+                          {isPro && <Star className="w-4 h-4 fill-amber-400 text-amber-400 animate-spin-slow" />}
+                        </div>
+                        {isPro ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary text-white dark:bg-primary dark:text-zinc-950 uppercase tracking-wide">
+                            Recomendado
+                          </span>
+                        ) : (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-primary-light text-primary">
+                            /{plan.slug}
+                          </span>
+                        )}
+                      </div>
 
-                    <div className="mt-4 flex items-baseline">
-                      <span className="text-3xl font-extrabold tracking-tight text-primary dark:text-primary">
-                        ${Number(plan.price).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                      </span>
-                      <span className="ml-1 text-sm text-zinc-505 dark:text-zinc-400 font-medium">
-                        / {plan.billing_interval === 'month' ? 'mes' : 'año'}
-                      </span>
-                    </div>
+                      <div className="mt-4 flex items-baseline">
+                        <span className="text-3xl font-extrabold tracking-tight text-primary dark:text-primary">
+                          ${Number(plan.price).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </span>
+                        <span className="ml-1 text-sm text-zinc-505 dark:text-zinc-400 font-medium">
+                          / {plan.billing_interval === 'month' ? 'mes' : 'año'}
+                        </span>
+                      </div>
 
-                    <ul className="mt-6 space-y-2.5 border-t border-border-custom pt-4">
-                      <li className="text-xs text-zinc-650 dark:text-zinc-305 flex items-center gap-2">
-                        <Check className="w-3.5 h-3.5 text-primary shrink-0" />
-                        <span>Límite Personal: {plan.max_staff !== null ? `${plan.max_staff} empleados` : 'Ilimitado'}</span>
-                      </li>
-                      <li className="text-xs text-zinc-655 dark:text-zinc-305 flex items-center gap-2">
-                        <Check className="w-3.5 h-3.5 text-primary shrink-0" />
-                        <span>Turnos/mes: {plan.max_appointments_per_month !== null ? `${plan.max_appointments_per_month} reservas` : 'Ilimitado'}</span>
-                      </li>
-                      {Array.isArray(plan.features) && plan.features.map((feat: string, idx: number) => (
-                        <li key={idx} className="text-xs text-zinc-650 dark:text-zinc-305 flex items-center gap-2">
+                      <ul className="mt-6 space-y-2.5 border-t border-border-custom pt-4">
+                        <li className="text-xs text-zinc-650 dark:text-zinc-305 flex items-center gap-2">
                           <Check className="w-3.5 h-3.5 text-primary shrink-0" />
-                          <span>{feat}</span>
+                          <span>Límite Personal: {plan.max_staff !== null ? `${plan.max_staff} empleados` : 'Ilimitado'}</span>
                         </li>
-                      ))}
-                    </ul>
-                  </div>
+                        <li className="text-xs text-zinc-655 dark:text-zinc-305 flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                          <span>Turnos/mes: {plan.max_appointments_per_month !== null ? `${plan.max_appointments_per_month} reservas` : 'Ilimitado'}</span>
+                        </li>
+                        {Array.isArray(plan.features) && plan.features.map((feat: string, idx: number) => (
+                          <li key={idx} className="text-xs text-zinc-650 dark:text-zinc-305 flex items-center gap-2">
+                            <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span>{feat}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
 
-                  <div className="mt-8 pt-4 border-t border-border-custom flex justify-end">
-                    <Button variant="outline" size="sm" onClick={() => handleOpenEditPlanModal(plan)} className="flex items-center gap-2">
-                      <Edit2 className="w-3.5 h-3.5" />
-                      Editar Plan
-                    </Button>
+                    <div className="mt-8 pt-4 border-t border-border-custom flex justify-end">
+                      <Button variant="outline" size="sm" onClick={() => handleOpenEditPlanModal(plan)} className="flex items-center gap-2 cursor-pointer">
+                        <Edit2 className="w-3.5 h-3.5" />
+                        Editar Plan
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </>
@@ -368,16 +376,16 @@ export default function SubscriptionsPage() {
           {/* Search bar */}
           <div className="flex items-center gap-3 w-full max-w-md">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-zinc-400" />
+              <Search className="absolute left-3 top-3.5 h-4 w-4 text-zinc-400" />
               <input
                 type="text"
                 placeholder="Buscar comercio..."
-                className="w-full pl-9 pr-4 py-2 text-sm bg-white dark:bg-card-custom border border-border-custom rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent dark:text-zinc-50 placeholder-zinc-400 transition-all"
+                className="w-full pl-9 pr-4 py-2.5 text-sm bg-white dark:bg-card-custom border border-border-custom rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent dark:text-zinc-50 placeholder-zinc-400 transition-all"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button variant="outline" size="sm" onClick={fetchData} className="p-2 cursor-pointer">
+            <Button variant="outline" size="md" onClick={fetchData} className="p-2.5 cursor-pointer">
               <RefreshCw className="w-4 h-4" />
             </Button>
           </div>
@@ -417,13 +425,40 @@ export default function SubscriptionsPage() {
                         </td>
                         <td className="px-6 py-4 text-sm text-zinc-900 dark:text-zinc-100 font-medium">
                           {tenant.subscription_plans?.name || (
-                            <span className="text-zinc-400 dark:text-zinc-600 italic">Sin Suscripción</span>
+                            <span className="text-zinc-400 dark:text-zinc-650 italic">Sin Suscripción</span>
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${subscriptionStatusColors[tenant.subscription_status]}`}>
-                            {tenant.subscription_status}
-                          </span>
+                          {tenant.subscription_status === 'active' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                              active
+                            </span>
+                          )}
+                          {tenant.subscription_status === 'trialing' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
+                              trialing
+                            </span>
+                          )}
+                          {tenant.subscription_status === 'past_due' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                              past due
+                            </span>
+                          )}
+                          {tenant.subscription_status === 'canceled' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-zinc-50 text-zinc-600 border-zinc-150 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700">
+                              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shrink-0"></span>
+                              canceled
+                            </span>
+                          )}
+                          {tenant.subscription_status === 'unpaid' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-red-50 text-red-700 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+                              unpaid
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400">
                           {tenant.subscription_status === 'trialing'
@@ -436,7 +471,7 @@ export default function SubscriptionsPage() {
                             variant="secondary"
                             size="sm"
                             onClick={() => handleOpenAssignModal(tenant)}
-                            className="flex items-center gap-1.5 ml-auto"
+                            className="flex items-center gap-1.5 ml-auto border border-border-custom hover:border-primary hover:text-primary transition-all duration-150 cursor-pointer"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                             <span>Asignar Plan</span>

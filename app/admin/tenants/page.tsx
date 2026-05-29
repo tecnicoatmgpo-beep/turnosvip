@@ -56,7 +56,6 @@ export default function TenantsPage() {
     setLoading(true)
     setErrorMsg('')
     try {
-      // Fetch tenants with plan name joined
       const { data: tenantsData, error: tenantsError } = await supabase
         .from('tenants')
         .select('*, subscription_plans(name)')
@@ -65,7 +64,6 @@ export default function TenantsPage() {
       if (tenantsError) throw tenantsError
       setTenants(tenantsData || [])
 
-      // Fetch plans for dropdown selection
       const { data: plansData, error: plansError } = await supabase
         .from('subscription_plans')
         .select('id, name')
@@ -125,7 +123,6 @@ export default function TenantsPage() {
 
       if (error) throw error
       
-      // Update local state
       setTenants(prev => prev.map(t => t.id === tenant.id ? { ...t, status: newStatus } : t))
     } catch (err: any) {
       alert(err.message || 'Error al cambiar estado')
@@ -154,7 +151,6 @@ export default function TenantsPage() {
 
     try {
       if (editingTenant) {
-        // Update existing tenant
         const { error } = await supabase
           .from('tenants')
           .update(payload)
@@ -162,7 +158,6 @@ export default function TenantsPage() {
 
         if (error) throw error
       } else {
-        // Create new tenant
         const { error } = await supabase
           .from('tenants')
           .insert([payload])
@@ -181,12 +176,6 @@ export default function TenantsPage() {
     t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.slug.toLowerCase().includes(searchQuery.toLowerCase())
   )
-
-  const statusColors = {
-    active: 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30',
-    suspended: 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30',
-    trial: 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30',
-  }
 
   return (
     <div className="space-y-6">
@@ -252,15 +241,28 @@ export default function TenantsPage() {
                       <div className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">{tenant.name}</div>
                       <div className="text-xs text-zinc-400 dark:text-zinc-500">/{tenant.slug}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-zinc-700 dark:text-zinc-300">
+                    <td className="px-6 py-4 text-sm text-zinc-700 dark:text-zinc-300 font-medium">
                       {tenant.subscription_plans?.name || <span className="text-zinc-400 italic">Ninguno</span>}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusColors[tenant.status]}`}>
-                        {tenant.status === 'active' && 'Activo'}
-                        {tenant.status === 'suspended' && 'Suspendido'}
-                        {tenant.status === 'trial' && 'En Prueba'}
-                      </span>
+                      {tenant.status === 'active' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                          Activo
+                        </span>
+                      )}
+                      {tenant.status === 'trial' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
+                          En Prueba
+                        </span>
+                      )}
+                      {tenant.status === 'suspended' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                          Suspendido
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-zinc-700 dark:text-zinc-300 capitalize">
                       {tenant.subscription_status}
@@ -273,17 +275,23 @@ export default function TenantsPage() {
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <Button
-                        variant={tenant.status === 'suspended' ? 'outline' : 'danger'}
+                        variant="outline"
                         size="sm"
                         onClick={() => handleToggleStatus(tenant)}
+                        className={`transition-colors duration-200 cursor-pointer ${
+                          tenant.status === 'suspended'
+                            ? 'border-emerald-200 text-emerald-600 dark:border-emerald-900/40 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20'
+                            : 'border-rose-250 text-rose-600 dark:border-rose-900/40 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20'
+                        }`}
                         title={tenant.status === 'suspended' ? 'Re-activar Cuenta' : 'Suspender Cuenta'}
                       >
-                        {tenant.status === 'suspended' ? <CheckCircle className="w-4 h-4 text-emerald-600" /> : <ShieldAlert className="w-4 h-4" />}
+                        {tenant.status === 'suspended' ? <CheckCircle className="w-4 h-4" /> : <ShieldAlert className="w-4 h-4" />}
                       </Button>
                       <Button
-                        variant="secondary"
+                        variant="outline"
                         size="sm"
                         onClick={() => handleOpenEditModal(tenant)}
+                        className="hover:border-primary hover:text-primary transition-all duration-150 cursor-pointer"
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
