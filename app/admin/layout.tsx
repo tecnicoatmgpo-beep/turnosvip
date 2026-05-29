@@ -36,16 +36,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ]
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-background dark:bg-background text-foreground flex flex-col md:flex-row">
       {/* Mobile Header */}
-      <header className="flex md:hidden items-center justify-between px-6 py-4 bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800">
+      <header className="flex md:hidden items-center justify-between px-6 py-4 bg-white dark:bg-card-custom border-b border-border-custom">
         <div className="flex items-center gap-2">
-          <Shield className="w-5 h-5 text-zinc-900 dark:text-zinc-50" />
-          <span className="font-bold text-zinc-900 dark:text-zinc-50 text-sm">Mi Turno VIP</span>
+          <div className="p-1.5 bg-primary-light text-primary rounded-lg">
+            <Shield className="w-5 h-5" />
+          </div>
+          <span className="font-bold text-zinc-900 dark:text-zinc-50 text-sm tracking-tight">Mi Turno VIP</span>
         </div>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-50 cursor-pointer"
+          className="text-zinc-650 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-50 cursor-pointer"
         >
           {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
@@ -55,13 +57,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside
         className={`${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:translate-x-0 fixed md:static inset-y-0 left-0 z-40 w-64 bg-white dark:bg-zinc-900 border-r border-zinc-100 dark:border-zinc-800 flex flex-col justify-between transition-transform duration-300 ease-in-out`}
+        } md:translate-x-0 fixed md:static inset-y-0 left-0 z-40 w-64 bg-white dark:bg-card-custom border-r border-border-custom flex flex-col justify-between transition-transform duration-300 ease-in-out`}
       >
         {/* Top Content */}
-        <div className="flex flex-col flex-1 py-6 px-4">
-          <div className="hidden md:flex items-center gap-2 px-3 mb-8">
-            <Shield className="w-6 h-6 text-zinc-900 dark:text-zinc-50" />
-            <span className="font-bold text-zinc-900 dark:text-zinc-50 text-base">Mi Turno VIP</span>
+        <div className="flex flex-col flex-1 py-6 px-3">
+          <div className="hidden md:flex items-center gap-2.5 px-3 mb-8">
+            <div className="p-2 bg-primary-light text-primary rounded-lg dark:bg-primary-light">
+              <Shield className="w-5 h-5" />
+            </div>
+            <span className="font-bold text-zinc-900 dark:text-zinc-50 text-base tracking-tight">Mi Turno VIP</span>
           </div>
 
           <nav className="space-y-1">
@@ -73,10 +77,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   key={item.href}
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150 border-l-4 ${
                     isActive
-                      ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                      : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
+                      ? 'bg-primary-light text-primary border-primary dark:bg-primary-light dark:text-primary dark:border-primary'
+                      : 'text-zinc-605 border-transparent hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900/50 dark:hover:text-zinc-100'
                   }`}
                 >
                   <Icon className="w-4 h-4 shrink-0" />
@@ -88,7 +92,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Bottom Profile / Logout */}
-        <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+        <div className="p-4 border-t border-border-custom space-y-2">
           <div className="flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400">
             <User className="w-4 h-4 shrink-0" />
             <span className="truncate">{adminEmail}</span>

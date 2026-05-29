@@ -208,7 +208,7 @@ export default function TenantsPage() {
           <input
             type="text"
             placeholder="Buscar por nombre o slug..."
-            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-950 dark:focus:ring-zinc-300 dark:text-zinc-50 placeholder-zinc-400"
+            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white dark:bg-card-custom border border-border-custom rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent dark:text-zinc-50 placeholder-zinc-400 transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -222,21 +222,21 @@ export default function TenantsPage() {
       {loading ? (
         <div className="space-y-4">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-16 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-lg animate-pulse" />
+            <div key={i} className="h-16 bg-white dark:bg-card-custom border border-border-custom rounded-lg animate-pulse" />
           ))}
         </div>
       ) : filteredTenants.length === 0 ? (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-12 text-center">
-          <Store className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
+        <div className="bg-white dark:bg-card-custom border border-border-custom rounded-xl p-12 text-center">
+          <Store className="w-12 h-12 text-primary/40 mx-auto mb-4" />
           <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-base">No se encontraron comercios</h3>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">Comienza agregando un nuevo comercio al sistema.</p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-xs">
+        <div className="bg-white dark:bg-card-custom border border-border-custom rounded-xl overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+                <tr className="border-b border-border-custom bg-zinc-50/50 dark:bg-primary-light/10">
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Nombre / Slug</th>
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Plan Activo</th>
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Estado</th>
@@ -245,9 +245,9 @@ export default function TenantsPage() {
                   <th className="px-6 py-4 text-right text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <tbody className="divide-y divide-border-custom">
                 {filteredTenants.map((tenant) => (
-                  <tr key={tenant.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                  <tr key={tenant.id} className="hover:bg-primary-light/20 dark:hover:bg-primary-light/10 transition-colors">
                     <td className="px-6 py-4">
                       <div className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">{tenant.name}</div>
                       <div className="text-xs text-zinc-400 dark:text-zinc-500">/{tenant.slug}</div>
@@ -379,7 +379,7 @@ export default function TenantsPage() {
             onChange={(e) => setFormData({ ...formData, current_period_end: e.target.value })}
           />
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-custom">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>

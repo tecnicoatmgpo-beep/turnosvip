@@ -98,13 +98,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
-      <div className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl shadow-xs p-8">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md bg-white dark:bg-card-custom border border-border-custom rounded-2xl shadow-sm p-8">
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="p-3 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 rounded-xl mb-4">
+          <div className="p-3 bg-primary-light text-primary rounded-xl mb-4">
             <Shield className="w-6 h-6" />
           </div>
-          <h2 className="text-xl font-bold text-zinc-950 dark:text-zinc-50">Mi Turno VIP</h2>
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 tracking-tight">Mi Turno VIP</h2>
           <p className="text-sm text-zinc-500 mt-1 dark:text-zinc-400">Panel de control del Superadministrador</p>
         </div>
 

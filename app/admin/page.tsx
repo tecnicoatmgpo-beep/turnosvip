@@ -66,7 +66,7 @@ export default function AdminDashboard() {
       {loading ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-32 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl animate-pulse" />
+            <div key={i} className="h-32 bg-white dark:bg-card-custom border border-border-custom rounded-xl animate-pulse" />
           ))}
         </div>
       ) : (
@@ -76,11 +76,11 @@ export default function AdminDashboard() {
             return (
               <div
                 key={card.name}
-                className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl p-6 shadow-xs flex flex-col justify-between"
+                className="bg-white dark:bg-card-custom border border-border-custom rounded-xl p-6 shadow-xs flex flex-col justify-between"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{card.name}</span>
-                  <div className="p-2.5 bg-zinc-50 dark:bg-zinc-800 rounded-lg text-zinc-900 dark:text-zinc-100">
+                  <span className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">{card.name}</span>
+                  <div className="p-2.5 bg-primary-light text-primary rounded-lg">
                     <Icon className="w-5 h-5" />
                   </div>
                 </div>
@@ -95,12 +95,12 @@ export default function AdminDashboard() {
       )}
 
       {/* Main Info */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl p-6">
+      <div className="bg-white dark:bg-card-custom border-l-4 border-primary border-t border-r border-b border-border-custom rounded-xl p-6 shadow-xs">
         <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
-          <Shield className="w-4 h-4" />
+          <Shield className="w-4 h-4 text-primary" />
           Consola del Superadministrador
         </h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 max-w-2xl leading-relaxed">
+        <p className="text-sm text-zinc-650 dark:text-zinc-400 mt-2 max-w-2xl leading-relaxed">
           Bienvenido al panel maestro. Desde aquí tienes control absoluto sobre el ciclo de vida del tenant, los slugs de enrutamiento y la configuración de planes de facturación.
           Los cambios realizados aquí afectan a la infraestructura del sistema y al acceso del usuario final.
         </p>

@@ -260,12 +260,12 @@ export default function SubscriptionsPage() {
       </div>
 
       {/* Tabs Switcher */}
-      <div className="flex border-b border-zinc-200 dark:border-zinc-800">
+      <div className="flex border-b border-border-custom">
         <button
           onClick={() => setActiveTab('plans')}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
             activeTab === 'plans'
-              ? 'border-zinc-900 text-zinc-900 dark:border-zinc-50 dark:text-zinc-50'
+              ? 'border-primary text-primary dark:border-primary dark:text-primary font-bold'
               : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'
           }`}
         >
@@ -278,7 +278,7 @@ export default function SubscriptionsPage() {
           onClick={() => setActiveTab('assign')}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
             activeTab === 'assign'
-              ? 'border-zinc-900 text-zinc-900 dark:border-zinc-50 dark:text-zinc-50'
+              ? 'border-primary text-primary dark:border-primary dark:text-primary font-bold'
               : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'
           }`}
         >
@@ -295,12 +295,12 @@ export default function SubscriptionsPage() {
           {loading ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {[1, 2].map(i => (
-                <div key={i} className="h-64 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl animate-pulse" />
+                <div key={i} className="h-64 bg-white dark:bg-card-custom border border-border-custom rounded-xl animate-pulse" />
               ))}
             </div>
           ) : plans.length === 0 ? (
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-12 text-center max-w-lg mx-auto">
-              <CreditCard className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
+            <div className="bg-white dark:bg-card-custom border border-border-custom rounded-xl p-12 text-center max-w-lg mx-auto">
+              <CreditCard className="w-12 h-12 text-primary/40 mx-auto mb-4" />
               <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-base">No hay planes creados</h3>
               <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">Registra los planes que ofrecerás a los dueños de salones.</p>
               <Button onClick={handleOpenAddPlanModal} className="mt-4">
@@ -312,44 +312,44 @@ export default function SubscriptionsPage() {
               {plans.map((plan) => (
                 <div
                   key={plan.id}
-                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 flex flex-col justify-between shadow-xs"
+                  className="bg-white dark:bg-card-custom border border-border-custom rounded-xl p-6 flex flex-col justify-between shadow-xs"
                 >
                   <div>
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">{plan.name}</h3>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-primary-light text-primary">
                         /{plan.slug}
                       </span>
                     </div>
 
                     <div className="mt-4 flex items-baseline">
-                      <span className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
+                      <span className="text-3xl font-extrabold tracking-tight text-primary dark:text-primary">
                         ${Number(plan.price).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                       </span>
-                      <span className="ml-1 text-sm text-zinc-500 dark:text-zinc-400">
+                      <span className="ml-1 text-sm text-zinc-505 dark:text-zinc-400 font-medium">
                         / {plan.billing_interval === 'month' ? 'mes' : 'año'}
                       </span>
                     </div>
 
-                    <ul className="mt-6 space-y-2 border-t border-zinc-200 dark:border-zinc-800 pt-4">
-                      <li className="text-xs text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
-                        <Check className="w-3.5 h-3.5 text-zinc-950 dark:text-zinc-50" />
+                    <ul className="mt-6 space-y-2.5 border-t border-border-custom pt-4">
+                      <li className="text-xs text-zinc-650 dark:text-zinc-305 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-primary shrink-0" />
                         <span>Límite Personal: {plan.max_staff !== null ? `${plan.max_staff} empleados` : 'Ilimitado'}</span>
                       </li>
-                      <li className="text-xs text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
-                        <Check className="w-3.5 h-3.5 text-zinc-955 dark:text-zinc-50" />
+                      <li className="text-xs text-zinc-655 dark:text-zinc-305 flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-primary shrink-0" />
                         <span>Turnos/mes: {plan.max_appointments_per_month !== null ? `${plan.max_appointments_per_month} reservas` : 'Ilimitado'}</span>
                       </li>
                       {Array.isArray(plan.features) && plan.features.map((feat: string, idx: number) => (
-                        <li key={idx} className="text-xs text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
-                          <Check className="w-3.5 h-3.5 text-zinc-950 dark:text-zinc-50" />
+                        <li key={idx} className="text-xs text-zinc-650 dark:text-zinc-305 flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-primary shrink-0" />
                           <span>{feat}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  <div className="mt-8 pt-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
+                  <div className="mt-8 pt-4 border-t border-border-custom flex justify-end">
                     <Button variant="outline" size="sm" onClick={() => handleOpenEditPlanModal(plan)} className="flex items-center gap-2">
                       <Edit2 className="w-3.5 h-3.5" />
                       Editar Plan
@@ -372,7 +372,7 @@ export default function SubscriptionsPage() {
               <input
                 type="text"
                 placeholder="Buscar comercio..."
-                className="w-full pl-9 pr-4 py-2 text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-950 dark:focus:ring-zinc-300 dark:text-zinc-50 placeholder-zinc-400"
+                className="w-full pl-9 pr-4 py-2 text-sm bg-white dark:bg-card-custom border border-border-custom rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent dark:text-zinc-50 placeholder-zinc-400 transition-all"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -386,21 +386,21 @@ export default function SubscriptionsPage() {
           {loading ? (
             <div className="space-y-4">
               {[1, 2, 3].map(i => (
-                <div key={i} className="h-16 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-lg animate-pulse" />
+                <div key={i} className="h-16 bg-white dark:bg-card-custom border border-border-custom rounded-lg animate-pulse" />
               ))}
             </div>
           ) : filteredTenants.length === 0 ? (
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-12 text-center">
-              <Users className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
+            <div className="bg-white dark:bg-card-custom border border-border-custom rounded-xl p-12 text-center">
+              <Users className="w-12 h-12 text-primary/40 mx-auto mb-4" />
               <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-base">No se encontraron comercios</h3>
               <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">Registra comercios en la pestaña Comercios para asignarles planes.</p>
             </div>
           ) : (
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-xs">
+            <div className="bg-white dark:bg-card-custom border border-border-custom rounded-xl overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+                    <tr className="border-b border-border-custom bg-zinc-50/50 dark:bg-primary-light/10">
                       <th className="px-6 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Comercio</th>
                       <th className="px-6 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Plan Asignado</th>
                       <th className="px-6 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Estado Membresía</th>
@@ -408,16 +408,16 @@ export default function SubscriptionsPage() {
                       <th className="px-6 py-4 text-right text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                  <tbody className="divide-y divide-border-custom">
                     {filteredTenants.map((tenant) => (
-                      <tr key={tenant.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                      <tr key={tenant.id} className="hover:bg-primary-light/20 dark:hover:bg-primary-light/10 transition-colors">
                         <td className="px-6 py-4">
                           <div className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">{tenant.name}</div>
                           <div className="text-xs text-zinc-400 dark:text-zinc-500">/{tenant.slug}</div>
                         </td>
                         <td className="px-6 py-4 text-sm text-zinc-900 dark:text-zinc-100 font-medium">
                           {tenant.subscription_plans?.name || (
-                            <span className="text-zinc-400 dark:text-zinc-650 italic">Sin Suscripción</span>
+                            <span className="text-zinc-400 dark:text-zinc-600 italic">Sin Suscripción</span>
                           )}
                         </td>
                         <td className="px-6 py-4">
@@ -535,11 +535,11 @@ export default function SubscriptionsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-500 mb-1 dark:text-zinc-400">
+            <label className="block text-xs font-semibold text-zinc-500 mb-1 dark:text-zinc-400 uppercase tracking-wide">
               Características del Plan
             </label>
             <textarea
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-950 dark:focus:ring-zinc-300 min-h-[80px]"
+              className="w-full px-3 py-2 text-sm bg-white dark:bg-card-custom border border-border-custom rounded-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-primary-accent min-h-[80px]"
               placeholder="Ej: Turnos Online, Recordatorios WhatsApp, Soporte VIP"
               value={planFormData.featuresText}
               onChange={(e) => setPlanFormData({ ...planFormData, featuresText: e.target.value })}
@@ -549,7 +549,7 @@ export default function SubscriptionsPage() {
             </p>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-custom">
             <Button type="button" variant="outline" onClick={() => setIsPlanModalOpen(false)}>
               Cancelar
             </Button>
@@ -611,7 +611,7 @@ export default function SubscriptionsPage() {
             onChange={(e) => setAssignFormData({ ...assignFormData, current_period_end: e.target.value })}
           />
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-custom">
             <Button type="button" variant="outline" onClick={() => setIsAssignModalOpen(false)}>
               Cancelar
             </Button>
