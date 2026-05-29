@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
-import { Plus, Edit2, Check, XCircle, CreditCard, Users, Search, RefreshCw, Star } from 'lucide-react'
+import { Plus, Edit2, Check, XCircle, CreditCard, Users, Search, RefreshCw, Star, Info } from 'lucide-react'
 
 interface Plan {
   id: string
@@ -68,6 +68,7 @@ export default function SubscriptionsPage() {
     subscription_status: 'trialing' as Tenant['subscription_status'],
     trial_ends_at: '',
     current_period_end: '',
+    duration: '30', // New: duration in days ('30', '60', '90', '180', '365', 'custom')
   })
 
   const supabase = createClient()
@@ -191,14 +192,61 @@ export default function SubscriptionsPage() {
   // --- SUBSCRIPTION ASSIGNMENT FUNCTIONS ---
   const handleOpenAssignModal = (tenant: Tenant) => {
     setEditingTenant(tenant)
+    
+    // Initial values
+    const initialPlanId = tenant.plan_id || ''
+    const initialStatus = tenant.subscription_status
+    const initialTrial = tenant.trial_ends_at ? tenant.trial_ends_at.split('T')[0] : ''
+    const initialEnd = tenant.current_period_end ? tenant.current_period_end.split('T')[0] : ''
+    
     setAssignFormData({
-      plan_id: tenant.plan_id || '',
-      subscription_status: tenant.subscription_status,
-      trial_ends_at: tenant.trial_ends_at ? tenant.trial_ends_at.split('T')[0] : '',
-      current_period_end: tenant.current_period_end ? tenant.current_period_end.split('T')[0] : '',
+      plan_id: initialPlanId,
+      subscription_status: initialStatus,
+      trial_ends_at: initialTrial,
+      current_period_end: initialEnd,
+      duration: '30',
     })
+    
     setErrorMsg('')
     setIsAssignModalOpen(true)
+    
+    // Auto-calculate end date for 30 days initially if a plan is assigned and end date is empty
+    if (initialPlanId && !initialEnd) {
+      const date = new Date()
+      date.setDate(date.getDate() + 30)
+      setAssignFormData(prev => ({
+        ...prev,
+        current_period_end: date.toISOString().split('T')[0],
+        duration: '30',
+      }))
+    }
+  }
+
+  // Calculate dynamic values when plan or duration changes
+  const handleAssignFormChange = (updatedFields: Partial<typeof assignFormData>) => {
+    const nextForm = { ...assignFormData, ...updatedFields }
+    
+    // If duration changes and is not 'custom', calculate new end date
+    if (updatedFields.duration && updatedFields.duration !== 'custom') {
+      const days = parseInt(updatedFields.duration, 10)
+      const date = new Date()
+      date.setDate(date.getDate() + days)
+      nextForm.current_period_end = date.toISOString().split('T')[0]
+    }
+    
+    // If plan_id changes to empty, clear end dates and duration
+    if (updatedFields.plan_id === '') {
+      nextForm.current_period_end = ''
+      nextForm.duration = 'custom'
+    } else if (updatedFields.plan_id && !nextForm.current_period_end) {
+      // If plan is selected and no end date is set, default to 30 days
+      nextForm.duration = '30'
+      const date = new Date()
+      date.setDate(date.getDate() + 30)
+      nextForm.current_period_end = date.toISOString().split('T')[0]
+    }
+
+    setAssignFormData(nextForm)
   }
 
   const handleAssignSubmit = async (e: React.FormEvent) => {
@@ -233,6 +281,21 @@ export default function SubscriptionsPage() {
     t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.slug.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const subscriptionStatusColors = {
+    active: 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30',
+    trialing: 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30',
+    past_due: 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30',
+    canceled: 'bg-zinc-50 text-zinc-600 border-zinc-150 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700',
+    unpaid: 'bg-red-50 text-red-700 border-red-100 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30',
+  }
+
+  // Calculate pricing summary for display
+  const selectedPlan = plans.find(p => p.id === assignFormData.plan_id)
+  const durationDays = parseInt(assignFormData.duration, 10)
+  const calculatedPrice = selectedPlan && !isNaN(durationDays)
+    ? selectedPlan.price * (durationDays / 30)
+    : 0
 
   return (
     <div className="space-y-6">
@@ -316,7 +379,7 @@ export default function SubscriptionsPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                           <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">{plan.name}</h3>
-                          {isPro && <Star className="w-4 h-4 fill-amber-400 text-amber-400 animate-spin-slow" />}
+                          {isPro && <Star className="w-4 h-4 fill-amber-400 text-amber-400" />}
                         </div>
                         {isPro ? (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary text-white dark:bg-primary dark:text-zinc-950 uppercase tracking-wide">
@@ -334,7 +397,7 @@ export default function SubscriptionsPage() {
                           ${Number(plan.price).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                         </span>
                         <span className="ml-1 text-sm text-zinc-505 dark:text-zinc-400 font-medium">
-                          / {plan.billing_interval === 'month' ? 'mes' : 'año'}
+                          / {plan.billing_interval === 'month' ? '30 días' : 'año'}
                         </span>
                       </div>
 
@@ -524,7 +587,7 @@ export default function SubscriptionsPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Precio (ARS)"
+              label="Precio (ARS) para 30 días"
               type="number"
               step="0.01"
               required
@@ -532,10 +595,10 @@ export default function SubscriptionsPage() {
               onChange={(e) => setPlanFormData({ ...planFormData, price: e.target.value })}
             />
             <Select
-              label="Frecuencia"
+              label="Frecuencia Base"
               options={[
-                { label: 'Mensual', value: 'month' },
-                { label: 'Anual', value: 'year' },
+                { label: 'Mensual (30 días)', value: 'month' },
+                { label: 'Anual (365 días)', value: 'year' },
               ]}
               value={planFormData.billing_interval}
               onChange={(e) => setPlanFormData({ ...planFormData, billing_interval: e.target.value })}
@@ -616,8 +679,24 @@ export default function SubscriptionsPage() {
               ...plans.map(p => ({ label: p.name, value: p.id }))
             ]}
             value={assignFormData.plan_id}
-            onChange={(e) => setAssignFormData({ ...assignFormData, plan_id: e.target.value })}
+            onChange={(e) => handleAssignFormChange({ plan_id: e.target.value })}
           />
+
+          {assignFormData.plan_id && (
+            <Select
+              label="Duración del Período"
+              options={[
+                { label: '30 Días (1 Mes)', value: '30' },
+                { label: '60 Días (2 Meses)', value: '60' },
+                { label: '90 Días (3 Meses)', value: '90' },
+                { label: '180 Días (6 Meses)', value: '180' },
+                { label: '365 Días (1 Año)', value: '365' },
+                { label: 'Personalizado (Fecha manual)', value: 'custom' },
+              ]}
+              value={assignFormData.duration}
+              onChange={(e) => handleAssignFormChange({ duration: e.target.value })}
+            />
+          )}
 
           <Select
             label="Estado de Facturación"
@@ -629,22 +708,55 @@ export default function SubscriptionsPage() {
               { label: 'Unpaid (Impago)', value: 'unpaid' },
             ]}
             value={assignFormData.subscription_status}
-            onChange={(e) => setAssignFormData({ ...assignFormData, subscription_status: e.target.value as Tenant['subscription_status'] })}
+            onChange={(e) => handleAssignFormChange({ subscription_status: e.target.value as Tenant['subscription_status'] })}
           />
 
           <Input
             label="Fecha Fin de Prueba (Solo si está en Trialing)"
             type="date"
             value={assignFormData.trial_ends_at}
-            onChange={(e) => setAssignFormData({ ...assignFormData, trial_ends_at: e.target.value })}
+            onChange={(e) => handleAssignFormChange({ trial_ends_at: e.target.value })}
           />
 
           <Input
             label="Fecha Fin de Período de Facturación"
             type="date"
             value={assignFormData.current_period_end}
-            onChange={(e) => setAssignFormData({ ...assignFormData, current_period_end: e.target.value })}
+            onChange={(e) => handleAssignFormChange({ current_period_end: e.target.value })}
+            disabled={assignFormData.duration !== 'custom'}
           />
+
+          {/* Pricing Calculation Summary Box */}
+          {selectedPlan && (
+            <div className="bg-primary-light/50 dark:bg-primary-light/20 p-4 border border-primary/20 rounded-xl space-y-2">
+              <h4 className="text-xs font-bold text-primary dark:text-primary-hover uppercase tracking-wider flex items-center gap-1.5">
+                <Info className="w-4 h-4 shrink-0" />
+                Resumen de Liquidación
+              </h4>
+              <div className="grid grid-cols-2 gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                <span>Precio base (30 días):</span>
+                <span className="text-right">${selectedPlan.price.toLocaleString('es-AR')} ARS</span>
+                
+                <span>Duración seleccionada:</span>
+                <span className="text-right">
+                  {assignFormData.duration === 'custom' 
+                    ? 'Manualmente especificado' 
+                    : `${assignFormData.duration} días (${Math.round(durationDays / 30)} meses)`
+                  }
+                </span>
+                
+                <div className="col-span-2 border-t border-primary/20 my-1 pt-1.5 flex justify-between text-sm font-extrabold text-primary dark:text-primary-hover">
+                  <span>Monto Total Proyectado:</span>
+                  <span>
+                    {assignFormData.duration === 'custom' 
+                      ? 'N/A' 
+                      : `$${calculatedPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })} ARS`
+                    }
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border-custom">
             <Button type="button" variant="outline" onClick={() => setIsAssignModalOpen(false)}>
