@@ -48,6 +48,8 @@ export default function TenantsPage() {
     subscription_status: 'trialing' as Tenant['subscription_status'],
     trial_ends_at: '',
     current_period_end: '',
+    adminEmail: '',
+    adminPassword: '',
   })
 
   const supabase = createClient()
@@ -93,6 +95,8 @@ export default function TenantsPage() {
       subscription_status: 'trialing',
       trial_ends_at: '',
       current_period_end: '',
+      adminEmail: '',
+      adminPassword: '',
     })
     setErrorMsg('')
     setIsModalOpen(true)
@@ -108,6 +112,8 @@ export default function TenantsPage() {
       subscription_status: tenant.subscription_status,
       trial_ends_at: tenant.trial_ends_at ? tenant.trial_ends_at.split('T')[0] : '',
       current_period_end: tenant.current_period_end ? tenant.current_period_end.split('T')[0] : '',
+      adminEmail: '',
+      adminPassword: '',
     })
     setErrorMsg('')
     setIsModalOpen(true)
@@ -151,6 +157,7 @@ export default function TenantsPage() {
 
     try {
       if (editingTenant) {
+        // Update existing tenant (directly client-side)
         const { error } = await supabase
           .from('tenants')
           .update(payload)
@@ -158,11 +165,33 @@ export default function TenantsPage() {
 
         if (error) throw error
       } else {
-        const { error } = await supabase
-          .from('tenants')
-          .insert([payload])
+        // Validate administrator details before posting
+        if (!formData.adminEmail || !formData.adminPassword) {
+          setErrorMsg('El email y contraseña del administrador son requeridos.')
+          return
+        }
+        if (formData.adminPassword.length < 6) {
+          setErrorMsg('La contraseña del administrador debe tener al menos 6 caracteres.')
+          return
+        }
 
-        if (error) throw error
+        // Create new tenant + initial user via API route
+        const response = await fetch('/api/admin/create-tenant', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...payload,
+            admin_email: formData.adminEmail,
+            admin_password: formData.adminPassword,
+          }),
+        })
+
+        const result = await response.json()
+        if (!response.ok) {
+          throw new Error(result.error || 'Error al registrar el comercio.')
+        }
       }
 
       setIsModalOpen(false)
@@ -176,6 +205,12 @@ export default function TenantsPage() {
     t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.slug.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const statusColors = {
+    active: 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30',
+    suspended: 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30',
+    trial: 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30',
+  }
 
   return (
     <div className="space-y-6">
@@ -386,6 +421,31 @@ export default function TenantsPage() {
             value={formData.current_period_end}
             onChange={(e) => setFormData({ ...formData, current_period_end: e.target.value })}
           />
+
+          {/* Form fields for initial administrator user (creation only) */}
+          {!editingTenant && (
+            <div className="border-t border-border-custom pt-4 space-y-4">
+              <h4 className="text-xs font-bold text-primary dark:text-primary-hover uppercase tracking-wider">
+                Usuario Administrador del Comercio
+              </h4>
+              <Input
+                label="Email del Administrador"
+                type="email"
+                placeholder="admin@comercio.com"
+                required
+                value={formData.adminEmail}
+                onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
+              />
+              <Input
+                label="Contraseña Inicial"
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                required
+                value={formData.adminPassword}
+                onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })}
+              />
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border-custom">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
