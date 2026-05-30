@@ -19,16 +19,23 @@ ALTER TABLE public.users ADD COLUMN IF NOT EXISTS specialty TEXT;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 -- Limpiar políticas existentes para evitar colisiones
+DROP POLICY IF EXISTS "Users can read their own profile" ON public.users;
 DROP POLICY IF EXISTS "Users can read other users in same tenant" ON public.users;
 DROP POLICY IF EXISTS "Tenant admins can manage users in same tenant" ON public.users;
 
--- 1. Permitir que cualquier empleado lea la información de los otros empleados del mismo comercio
+-- 1. Permitir que cualquier usuario lea su propio perfil (Esencial para iniciar sesión)
+CREATE POLICY "Users can read their own profile"
+    ON public.users
+    FOR SELECT
+    USING (auth.uid() = id);
+
+-- 2. Permitir que cualquier empleado lea la información de los otros empleados del mismo comercio
 CREATE POLICY "Users can read other users in same tenant"
     ON public.users
     FOR SELECT
     USING (tenant_id = public.get_user_tenant_id() OR public.is_superadmin());
 
--- 2. Permitir que el Administrador de Salón gestione (modifique/elimine) perfiles de su propio comercio
+-- 3. Permitir que el Administrador de Salón gestione (modifique/elimine) perfiles de su propio comercio
 CREATE POLICY "Tenant admins can manage users in same tenant"
     ON public.users
     FOR ALL
