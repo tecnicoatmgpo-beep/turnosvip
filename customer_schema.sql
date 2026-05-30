@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
     email TEXT,
     birthday DATE,
     category TEXT NOT NULL CHECK (category IN ('nuevo', 'regular', 'frecuente', 'vip')) DEFAULT 'regular',
+    discount_percent NUMERIC(5, 2) NOT NULL DEFAULT 0.00 CHECK (discount_percent >= 0 AND discount_percent <= 100),
     notes TEXT, -- Notas de estética (Tipo de piel, alergias a químicos, parámetros láser, etc.)
     address TEXT, -- Dirección
     locality TEXT, -- Localidad

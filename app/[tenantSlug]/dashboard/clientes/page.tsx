@@ -37,6 +37,7 @@ interface Customer {
   email: string | null
   birthday: string | null
   category: 'nuevo' | 'regular' | 'frecuente' | 'vip'
+  discount_percent: number
   notes: string | null
   address: string | null
   locality: string | null
@@ -79,6 +80,46 @@ const CATEGORY_BADGES = {
   vip: 'bg-emerald-50 text-emerald-700 border-emerald-150 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50 animate-pulse-slow'
 }
 
+const LOCALIDADES_LA_PAMPA = [
+  { label: 'Santa Rosa', value: 'Santa Rosa' },
+  { label: 'General Pico', value: 'General Pico' },
+  { label: 'Toay', value: 'Toay' },
+  { label: 'Realicó', value: 'Realicó' },
+  { label: 'Eduardo Castex', value: 'Eduardo Castex' },
+  { label: '25 de Mayo', value: '25 de Mayo' },
+  { label: 'Intendente Alvear', value: 'Intendente Alvear' },
+  { label: 'Victorica', value: 'Victorica' },
+  { label: 'Guatraché', value: 'Guatraché' },
+  { label: 'Macachín', value: 'Macachín' },
+  { label: 'Catriló', value: 'Catriló' },
+  { label: 'General Acha', value: 'General Acha' },
+  { label: 'Quemú Quemú', value: 'Quemú Quemú' },
+  { label: 'Ingeniero Luiggi', value: 'Ingeniero Luiggi' },
+  { label: 'Colonia Barón', value: 'Colonia Barón' },
+  { label: 'General San Martín', value: 'General San Martín' },
+  { label: 'Alpachiri', value: 'Alpachiri' },
+  { label: 'Winifreda', value: 'Winifreda' },
+  { label: 'Trenel', value: 'Trenel' },
+  { label: 'Rancul', value: 'Rancul' },
+  { label: 'Jacinto Arauz', value: 'Jacinto Arauz' },
+  { label: 'Santa Isabel', value: 'Santa Isabel' },
+  { label: 'Lonquimay', value: 'Lonquimay' },
+  { label: 'Anguil', value: 'Anguil' },
+  { label: 'Miguel Riglos', value: 'Miguel Riglos' },
+  { label: 'Doblas', value: 'Doblas' },
+  { label: 'Bernasconi', value: 'Bernasconi' },
+  { label: 'Caleufú', value: 'Caleufú' },
+  { label: 'La Adela', value: 'La Adela' },
+  { label: 'Otra (Fuera de La Pampa)', value: 'Otra' }
+]
+
+const DEFAULT_DISCOUNTS = {
+  regular: '0',
+  nuevo: '10',
+  frecuente: '5',
+  vip: '15'
+}
+
 export default function ClientesPage() {
   const params = useParams()
   const tenantSlug = params.tenantSlug as string
@@ -116,10 +157,11 @@ export default function ClientesPage() {
     email: '',
     birthday: '',
     category: 'regular' as Customer['category'],
+    discount_percent: '0',
     notes: '',
     address: '',
-    locality: '',
-    province: ''
+    locality: 'Santa Rosa',
+    province: 'La Pampa'
   })
 
   // Product Sale Form (rendered in History tab)
@@ -238,10 +280,11 @@ export default function ClientesPage() {
       email: '',
       birthday: '',
       category: 'regular',
+      discount_percent: '0',
       notes: '',
       address: '',
-      locality: '',
-      province: ''
+      locality: 'Santa Rosa',
+      province: 'La Pampa'
     })
     setErrorMsg('')
     setIsCRUDModalOpen(true)
@@ -266,10 +309,11 @@ export default function ClientesPage() {
       email: customer.email || '',
       birthday: customer.birthday || '',
       category: customer.category,
+      discount_percent: (customer.discount_percent ?? 0).toString(),
       notes: customer.notes || '',
       address: customer.address || '',
-      locality: customer.locality || '',
-      province: customer.province || ''
+      locality: customer.locality || 'Santa Rosa',
+      province: customer.province || 'La Pampa'
     })
     setErrorMsg('')
     setIsCRUDModalOpen(true)
@@ -314,6 +358,7 @@ export default function ClientesPage() {
       email: formData.email.trim() || null,
       birthday: formData.birthday || null,
       category: formData.category,
+      discount_percent: parseFloat(formData.discount_percent) || 0.00,
       notes: formData.notes.trim() || null,
       address: formData.address.trim() || null,
       locality: formData.locality.trim() || null,
@@ -518,9 +563,14 @@ export default function ClientesPage() {
                       }) : '-'}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${CATEGORY_BADGES[customer.category]}`}>
-                        {CATEGORY_LABELS[customer.category].split(' ')[0]}
-                      </span>
+                      <div className="flex flex-col gap-0.5 items-start">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${CATEGORY_BADGES[customer.category]}`}>
+                          {customer.category.toUpperCase()}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 dark:text-zinc-505 font-medium ml-1 font-semibold">
+                          Desc: {customer.discount_percent}%
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <Button
@@ -592,7 +642,7 @@ export default function ClientesPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-zinc-550 mb-1 dark:text-zinc-400 uppercase tracking-wide">
-                Teléfono / Celular (Prefijo +54 9 siempre integrado)
+                Teléfono / Celular
               </label>
               <div className="flex rounded-lg overflow-hidden border border-border-custom bg-white dark:bg-card-custom transition-all focus-within:ring-2 focus-within:ring-primary-accent">
                 <span className="inline-flex items-center px-3 bg-zinc-50 dark:bg-zinc-900 border-r border-border-custom text-zinc-505 text-sm font-semibold select-none">
@@ -617,7 +667,7 @@ export default function ClientesPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <Input
               label="Fecha de Nacimiento"
               type="date"
@@ -627,32 +677,49 @@ export default function ClientesPage() {
             <Select
               label="Categoría de Cliente"
               options={[
-                { label: 'Nuevo (10% descuento)', value: 'nuevo' },
                 { label: 'Regular (Sin descuento)', value: 'regular' },
-                { label: 'Frecuente (5% descuento)', value: 'frecuente' },
-                { label: 'VIP (15% descuento)', value: 'vip' }
+                { label: 'Nuevo (10% desc. predeterminado)', value: 'nuevo' },
+                { label: 'Frecuente (5% desc. predeterminado)', value: 'frecuente' },
+                { label: 'VIP (15% desc. predeterminado)', value: 'vip' }
               ]}
               value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value as Customer['category'] })}
+              onChange={(e) => {
+                const cat = e.target.value as Customer['category']
+                setFormData(prev => ({
+                  ...prev,
+                  category: cat,
+                  discount_percent: DEFAULT_DISCOUNTS[cat]
+                }))
+              }}
+            />
+            <Input
+              label="Descuento (%)"
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              required
+              value={formData.discount_percent}
+              onChange={(e) => setFormData({ ...formData, discount_percent: e.target.value })}
             />
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <Input
               label="Dirección"
-              placeholder="Ej. Av. Santa Fe 1234"
+              placeholder="Ej. Av. San Martín 123"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
             />
-            <Input
+            <Select
               label="Localidad"
-              placeholder="Ej. Palermo"
+              options={LOCALIDADES_LA_PAMPA}
               value={formData.locality}
               onChange={(e) => setFormData({ ...formData, locality: e.target.value })}
             />
             <Input
               label="Provincia"
-              placeholder="Ej. CABA"
+              placeholder="Ej. La Pampa"
               value={formData.province}
               onChange={(e) => setFormData({ ...formData, province: e.target.value })}
             />
@@ -716,9 +783,14 @@ export default function ClientesPage() {
                   </div>
                 </div>
               </div>
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${CATEGORY_BADGES[selectedCustomer.category]}`}>
-                {CATEGORY_LABELS[selectedCustomer.category]}
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${CATEGORY_BADGES[selectedCustomer.category]}`}>
+                  {selectedCustomer.category.toUpperCase()}
+                </span>
+                <span className="text-[10px] font-bold text-primary dark:text-primary-hover bg-primary-light/50 dark:bg-primary-light/10 px-2 py-0.5 rounded-md">
+                  Desc. Especial: {selectedCustomer.discount_percent}%
+                </span>
+              </div>
             </div>
 
             {/* Care alerts / Aesthetics notes */}

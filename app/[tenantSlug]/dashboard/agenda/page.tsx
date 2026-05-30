@@ -52,6 +52,7 @@ interface Customer {
   email: string | null
   birthday?: string | null
   category: 'nuevo' | 'regular' | 'frecuente' | 'vip'
+  discount_percent: number
   notes: string | null
 }
 
@@ -79,12 +80,6 @@ interface Appointment {
 
 type ViewMode = 'day' | 'week' | 'list'
 
-const DISCOUNT_MULTIPLIERS = {
-  vip: 0.15,
-  frecuente: 0.05,
-  nuevo: 0.10,
-  regular: 0.00
-}
 
 export default function AgendaPage() {
   const params = useParams()
@@ -185,7 +180,7 @@ export default function AgendaPage() {
       // 5. Fetch Customers
       const { data: customersData } = await supabase
         .from('customers')
-        .select('id, first_name, last_name, phone, email, category, notes')
+        .select('id, first_name, last_name, phone, email, category, notes, discount_percent')
         .eq('tenant_id', tenant.id)
         .order('first_name')
 
@@ -229,7 +224,7 @@ export default function AgendaPage() {
     }
   }
 
-  // Handle service change to pre-fill standard price, applying category discount if customer is selected
+  // Handle service change to pre-fill standard price, applying custom discount if customer is selected
   const handleServiceChange = (serviceId: string, currentCustomerId?: string) => {
     const selectedService = services.find(s => s.id === serviceId)
     const basePrice = selectedService ? selectedService.price : 0
@@ -239,7 +234,7 @@ export default function AgendaPage() {
     
     let finalPrice = basePrice
     if (selectedCustomer) {
-      const discountPercent = DISCOUNT_MULTIPLIERS[selectedCustomer.category] || 0
+      const discountPercent = (selectedCustomer.discount_percent ?? 0) / 100
       finalPrice = basePrice * (1 - discountPercent)
     }
     
@@ -257,7 +252,7 @@ export default function AgendaPage() {
     const basePrice = selectedService ? selectedService.price : 0
     
     if (selectedCustomer) {
-      const discountPercent = DISCOUNT_MULTIPLIERS[selectedCustomer.category] || 0
+      const discountPercent = (selectedCustomer.discount_percent ?? 0) / 100
       const finalPrice = basePrice * (1 - discountPercent)
       
       setFormData(prev => ({
@@ -1062,7 +1057,7 @@ export default function AgendaPage() {
               <option value="">-- Ingreso manual (Cliente no registrado) --</option>
               {customers.map(c => (
                 <option key={c.id} value={c.id}>
-                  {c.first_name} {c.last_name} ({c.phone}) - {c.category.toUpperCase()}
+                  {c.first_name} {c.last_name} ({c.phone}) - {c.category.toUpperCase()} ({c.discount_percent}%)
                 </option>
               ))}
             </select>
@@ -1072,7 +1067,7 @@ export default function AgendaPage() {
             (() => {
               const selectedCustomer = customers.find(c => c.id === formData.customer_id)
               if (!selectedCustomer) return null
-              const discountPercent = (DISCOUNT_MULTIPLIERS[selectedCustomer.category] || 0) * 100
+              const discountPercent = selectedCustomer.discount_percent ?? 0
               return (
                 <div className="p-3 bg-primary-light/10 dark:bg-primary-light/5 border border-primary/20 rounded-xl space-y-1.5 text-xs text-zinc-705 dark:text-zinc-300">
                   <div className="flex justify-between items-center font-bold">
