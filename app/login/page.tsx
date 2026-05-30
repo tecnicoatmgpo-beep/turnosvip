@@ -18,7 +18,9 @@ function LoginForm() {
   useEffect(() => {
     const errorParam = searchParams.get('error')
     if (errorParam === 'unauthorized') {
-      setErrorMsg('No tienes permisos de Superadministrador para acceder a esta área.')
+      setErrorMsg('No tienes permisos para acceder a esta área.')
+    } else if (errorParam === 'tenant_inactive') {
+      setErrorMsg('El comercio asociado a tu cuenta está inactivo o suspendido.')
     }
   }, [searchParams])
 
@@ -39,19 +41,43 @@ function LoginForm() {
       }
 
       if (data?.user) {
-        // Query users table to verify role is 'superadmin'
+        // Query users table to verify role and tenant
         const { data: profile, error: profileError } = await supabase
           .from('users')
-          .select('role')
+          .select('role, tenant_id')
           .eq('id', data.user.id)
           .single()
 
-        if (profileError || !profile || profile.role !== 'superadmin') {
+        if (profileError || !profile) {
           await supabase.auth.signOut()
-          throw new Error('Acceso restringido. Solo superadministradores.')
+          throw new Error('Perfil de usuario no registrado en el sistema público.')
         }
 
-        router.push('/admin')
+        if (profile.role === 'superadmin') {
+          router.push('/admin')
+        } else if ((profile.role === 'tenant_admin' || profile.role === 'staff') && profile.tenant_id) {
+          // Resolve tenant slug by UUID
+          const { data: tenant, error: tenantError } = await supabase
+            .from('tenants')
+            .select('slug, status')
+            .eq('id', profile.tenant_id)
+            .single()
+
+          if (tenantError || !tenant) {
+            await supabase.auth.signOut()
+            throw new Error('El comercio asociado no existe.')
+          }
+
+          if (tenant.status === 'suspended') {
+            await supabase.auth.signOut()
+            throw new Error('Tu comercio está suspendido. Contacta al superadministrador.')
+          }
+
+          router.push(`/${tenant.slug}/dashboard`)
+        } else {
+          await supabase.auth.signOut()
+          throw new Error('No tienes un rol asignado válido para este panel.')
+        }
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al iniciar sesión.')
@@ -72,7 +98,7 @@ function LoginForm() {
       <Input
         label="Correo electrónico"
         type="email"
-        placeholder="admin@miturnovip.com"
+        placeholder="admin@miturnovip.com o empleado@comercio.com"
         required
         value={email}
         onChange={(e) => setEmail(e.target.value)}
@@ -89,8 +115,8 @@ function LoginForm() {
         disabled={loading}
       />
 
-      <Button type="submit" className="w-full justify-center" disabled={loading}>
-        {loading ? 'Iniciando sesión...' : 'Ingresar al Panel'}
+      <Button type="submit" className="w-full justify-center animate-pulse-slow" disabled={loading}>
+        {loading ? 'Iniciando sesión...' : 'Ingresar al Sistema'}
       </Button>
     </form>
   )
@@ -102,10 +128,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white dark:bg-card-custom border border-border-custom rounded-2xl shadow-sm p-8">
         <div className="flex flex-col items-center text-center mb-8">
           <div className="p-3 bg-primary-light text-primary rounded-xl mb-4">
-            <Shield className="w-6 h-6" />
+            <Shield className="w-6 h-6 animate-pulse-slow" />
           </div>
           <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 tracking-tight">Mi Turno VIP</h2>
-          <p className="text-sm text-zinc-500 mt-1 dark:text-zinc-400">Panel de control del Superadministrador</p>
+          <p className="text-sm text-zinc-500 mt-1 dark:text-zinc-400">Acceso Administradores y Personal</p>
         </div>
 
         <Suspense fallback={<p className="text-center text-sm text-zinc-500">Cargando...</p>}>

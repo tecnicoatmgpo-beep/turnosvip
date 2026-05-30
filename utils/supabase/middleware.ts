@@ -29,12 +29,13 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Retrieve user session
+  // Retrieve auth user session
   const { data: { user } } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
+  const pathParts = path.split('/').filter(Boolean) // e.g. ['bellavista', 'dashboard', 'agenda']
 
-  // Protected route admin check
+  // 1. Protect global superadmin paths (/admin/*)
   if (path.startsWith('/admin')) {
     if (!user) {
       const url = request.nextUrl.clone()
@@ -42,7 +43,6 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    // Query profile database to verify if user has 'superadmin' role
     const { data: profile, error } = await supabase
       .from('users')
       .select('role')
@@ -50,8 +50,6 @@ export async function updateSession(request: NextRequest) {
       .single()
 
     if (error || !profile || profile.role !== 'superadmin') {
-      // User is authenticated but NOT a superadmin. Redirect to login with error param.
-      // Sign out to clear invalid session on failure
       await supabase.auth.signOut()
       const url = request.nextUrl.clone()
       url.pathname = '/login'
@@ -60,18 +58,84 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Prevent logged-in superadmin from visiting /login
-  if (path === '/login' && user) {
-    const { data: profile } = await supabase
+  // 2. Protect tenant dashboard paths (/[tenantSlug]/dashboard/*)
+  if (pathParts.length >= 2 && pathParts[1] === 'dashboard') {
+    const tenantSlug = pathParts[0]
+
+    if (!user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
+    }
+
+    // Fetch user details
+    const { data: profile, error: profileError } = await supabase
       .from('users')
-      .select('role')
+      .select('role, tenant_id')
       .eq('id', user.id)
       .single()
 
-    if (profile && profile.role === 'superadmin') {
+    if (profileError || !profile) {
+      await supabase.auth.signOut()
       const url = request.nextUrl.clone()
-      url.pathname = '/admin'
+      url.pathname = '/login'
+      url.searchParams.set('error', 'unauthorized')
       return NextResponse.redirect(url)
+    }
+
+    // Superadmin is allowed to access any tenant dashboard for support oversight
+    if (profile.role !== 'superadmin') {
+      // Resolve tenant UUID by slug
+      const { data: tenant, error: tenantError } = await supabase
+        .from('tenants')
+        .select('id, status')
+        .eq('slug', tenantSlug)
+        .single()
+
+      if (tenantError || !tenant || tenant.status === 'suspended') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/login'
+        url.searchParams.set('error', 'tenant_inactive')
+        return NextResponse.redirect(url)
+      }
+
+      // Check user association and roles
+      if (profile.tenant_id !== tenant.id || (profile.role !== 'tenant_admin' && profile.role !== 'staff')) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/login'
+        url.searchParams.set('error', 'unauthorized')
+        return NextResponse.redirect(url)
+      }
+    }
+  }
+
+  // 3. Prevent logged-in users from hitting /login
+  if (path === '/login' && user) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role, tenant_id')
+      .eq('id', user.id)
+      .single()
+
+    if (profile) {
+      if (profile.role === 'superadmin') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/admin'
+        return NextResponse.redirect(url)
+      } else if ((profile.role === 'tenant_admin' || profile.role === 'staff') && profile.tenant_id) {
+        // Resolve tenant slug
+        const { data: tenant } = await supabase
+          .from('tenants')
+          .select('slug')
+          .eq('id', profile.tenant_id)
+          .single()
+
+        if (tenant) {
+          const url = request.nextUrl.clone()
+          url.pathname = `/${tenant.slug}/dashboard`
+          return NextResponse.redirect(url)
+        }
+      }
     }
   }
 
