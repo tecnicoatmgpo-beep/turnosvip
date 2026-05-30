@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
 import { Plus, Edit2, Trash2, Search, Scissors, RefreshCw, XCircle } from 'lucide-react'
 
@@ -17,6 +18,19 @@ interface Service {
   category: string | null
   tenant_id: string
 }
+
+const AESTHETIC_CATEGORIES = [
+  { label: 'Facial (Tratamientos Faciales)', value: 'Facial' },
+  { label: 'Corporal (Tratamientos Corporales)', value: 'Corporal' },
+  { label: 'Depilación (Láser / Definitiva)', value: 'Depilación' },
+  { label: 'Manicuría & Pedicuría', value: 'Manicuría' },
+  { label: 'Cejas & Pestañas', value: 'Cejas y Pestañas' },
+  { label: 'Peluquería & Peinados', value: 'Peluquería' },
+  { label: 'Masajes & Bienestar', value: 'Masajes' },
+  { label: 'Maquillaje Profesional', value: 'Maquillaje' },
+  { label: 'Medicina Estética', value: 'Medicina Estética' },
+  { label: 'Otros / General', value: 'General' }
+]
 
 export default function ServicesPage() {
   const params = useParams()
@@ -38,7 +52,7 @@ export default function ServicesPage() {
     description: '',
     duration_minutes: '30',
     price: '0.00',
-    category: '',
+    category: 'Facial',
   })
 
   const supabase = createClient()
@@ -87,7 +101,7 @@ export default function ServicesPage() {
       description: '',
       duration_minutes: '30',
       price: '0.00',
-      category: '',
+      category: 'Facial',
     })
     setErrorMsg('')
     setIsModalOpen(true)
@@ -100,7 +114,7 @@ export default function ServicesPage() {
       description: service.description || '',
       duration_minutes: service.duration_minutes.toString(),
       price: service.price.toString(),
-      category: service.category || '',
+      category: service.category || 'Facial',
     })
     setErrorMsg('')
     setIsModalOpen(true)
@@ -321,9 +335,9 @@ export default function ServicesPage() {
             />
           </div>
 
-          <Input
+          <Select
             label="Categoría"
-            placeholder="Ej. Peluquería, Color, Manicuría"
+            options={AESTHETIC_CATEGORIES}
             value={formData.category}
             onChange={(e) => setFormData({ ...formData, category: e.target.value })}
           />
