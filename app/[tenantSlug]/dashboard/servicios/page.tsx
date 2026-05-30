@@ -245,7 +245,7 @@ export default function ServicesPage() {
                       <div className="text-xs text-zinc-400 dark:text-zinc-500 line-clamp-1">{service.description || 'Sin descripción'}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-350 capitalize border border-transparent">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary-light text-primary border border-primary-accent/20 capitalize">
                         {service.category || 'General'}
                       </span>
                     </td>
