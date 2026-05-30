@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
-import { Edit2, Plus, Search, ShieldAlert, CheckCircle, RefreshCw, XCircle, Store } from 'lucide-react'
+import { Edit2, Plus, Search, ShieldAlert, CheckCircle, RefreshCw, XCircle, Store, UserPlus } from 'lucide-react'
 
 interface Tenant {
   id: string
@@ -52,7 +52,71 @@ export default function TenantsPage() {
     adminPassword: '',
   })
 
+  // Create User modal controls
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false)
+  const [selectedTenantForUser, setSelectedTenantForUser] = useState<Tenant | null>(null)
+  const [userFormData, setUserFormData] = useState({
+    email: '',
+    password: '',
+    role: 'tenant_admin' as 'tenant_admin' | 'staff'
+  })
+  const [userErrorMsg, setUserErrorMsg] = useState('')
+  const [userSuccessMsg, setUserSuccessMsg] = useState('')
+
   const supabase = createClient()
+
+  const handleOpenUserModal = (tenant: Tenant) => {
+    setSelectedTenantForUser(tenant)
+    setUserFormData({
+      email: '',
+      password: '',
+      role: 'tenant_admin'
+    })
+    setUserErrorMsg('')
+    setUserSuccessMsg('')
+    setIsUserModalOpen(true)
+  }
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setUserErrorMsg('')
+    setUserSuccessMsg('')
+
+    if (!selectedTenantForUser) return
+
+    try {
+      const response = await fetch('/api/admin/create-tenant-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tenant_id: selectedTenantForUser.id,
+          email: userFormData.email.trim(),
+          password: userFormData.password,
+          role: userFormData.role,
+        }),
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al registrar el usuario.')
+      }
+
+      setUserSuccessMsg(`Usuario creado con éxito para ${selectedTenantForUser.name}.`)
+      setUserFormData({
+        email: '',
+        password: '',
+        role: 'tenant_admin'
+      })
+      setTimeout(() => {
+        setIsUserModalOpen(false)
+        setUserSuccessMsg('')
+      }, 3000)
+    } catch (err: any) {
+      setUserErrorMsg(err.message || 'Error al guardar usuario.')
+    }
+  }
 
   const fetchTenantsAndPlans = async () => {
     setLoading(true)
@@ -312,6 +376,15 @@ export default function TenantsPage() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => handleOpenUserModal(tenant)}
+                        className="border-indigo-250 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900/40 dark:text-indigo-400 dark:hover:bg-indigo-950/20 cursor-pointer"
+                        title="Crear Usuario"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleToggleStatus(tenant)}
                         className={`transition-colors duration-200 cursor-pointer ${
                           tenant.status === 'suspended'
@@ -453,6 +526,66 @@ export default function TenantsPage() {
             </Button>
             <Button type="submit">
               {editingTenant ? 'Guardar Cambios' : 'Registrar Comercio'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal dialog for Create User for Existing Tenant */}
+      <Modal
+        isOpen={isUserModalOpen}
+        onClose={() => setIsUserModalOpen(false)}
+        title={`Crear Usuario para ${selectedTenantForUser?.name}`}
+      >
+        <form onSubmit={handleCreateUser} className="space-y-4">
+          {userErrorMsg && (
+            <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg text-rose-600 text-xs flex items-start gap-2 dark:bg-rose-950/20 dark:border-rose-950/30 dark:text-rose-400">
+              <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{userErrorMsg}</span>
+            </div>
+          )}
+
+          {userSuccessMsg && (
+            <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-700 text-xs flex items-start gap-2 dark:bg-emerald-950/20 dark:border-emerald-950/30 dark:text-emerald-400">
+              <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{userSuccessMsg}</span>
+            </div>
+          )}
+
+          <Input
+            label="Correo electrónico"
+            type="email"
+            placeholder="ejemplo@correo.com"
+            required
+            value={userFormData.email}
+            onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
+          />
+
+          <Input
+            label="Contraseña"
+            type="password"
+            placeholder="Mínimo 6 caracteres"
+            required
+            value={userFormData.password}
+            onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
+          />
+
+          <Select
+            label="Rol de Usuario"
+            options={[
+              { label: 'Administrador de Comercio', value: 'tenant_admin' },
+              { label: 'Empleado / Staff (Acceso limitado)', value: 'staff' },
+            ]}
+            value={userFormData.role}
+            onChange={(e) => setUserFormData({ ...userFormData, role: e.target.value as 'tenant_admin' | 'staff' })}
+          />
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-custom">
+            <Button type="button" variant="outline" onClick={() => setIsUserModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit">
+              Crear Usuario
             </Button>
           </div>
         </form>
