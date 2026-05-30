@@ -33,6 +33,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Inicio', href: '/admin', icon: LayoutDashboard },
     { name: 'Comercios (Tenants)', href: '/admin/tenants', icon: Store },
     { name: 'Suscripciones', href: '/admin/subscriptions', icon: CreditCard },
+    { name: 'Cuentas y Personal', href: '/admin/users', icon: User },
   ]
 
   return (
