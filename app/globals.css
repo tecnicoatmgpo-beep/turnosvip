@@ -1,28 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fbfdfc;
-  --foreground: #0f1c16;
-  --primary: #1b4332;
-  --primary-hover: #2d6a4f;
-  --primary-light: #e8f5e9;
-  --primary-accent: #40916c;
-  --border: #e2eaf0;
-  
+  /* Vibrant & energetic light theme */
+  --background: #f4faf6; /* Super fresh minty off-white backdrop */
+  --foreground: #081a12; /* Rich dark-emerald charcoal */
+  --primary: #059669; /* Energetic deep emerald-600 */
+  --primary-hover: #047857; /* Deep emerald-700 */
+  --primary-light: #d1fae5; /* Refreshing light emerald-100 */
+  --primary-accent: #10b981; /* High-vibrancy emerald-500 */
+  --border: #d1fae5; /* Delicate mint-green border */
   --card: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #08120e;
-    --foreground: #f2f7f4;
-    --primary: #52b788;
-    --primary-hover: #74c69d;
-    --primary-light: #0d2c20;
-    --primary-accent: #40916c;
-    --border: #162c22;
-    
-    --card: #0d1a14;
+    /* High-contrast luxurious dark theme (Obsidian-Jade) */
+    --background: #020805; /* Deep black-emerald obsidian */
+    --foreground: #ecfdf5; /* Crisp mint off-white */
+    --primary: #10b981; /* Luminous mint green (emerald-500) */
+    --primary-hover: #34d399; /* Radiant neon light mint */
+    --primary-light: #064e3b; /* Rich dark forest green container backdrop */
+    --primary-accent: #00f5a0; /* Electrifying neon-mint glow pop accent */
+    --border: #0e271a; /* Elegant dark-jade border */
+    --card: #060e0a; /* Premium dark card background */
   }
 }
 
@@ -43,4 +43,40 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
+  transition: background-color 0.25s ease-in-out, border-color 0.25s ease-in-out;
+}
+
+/* Custom premium scrollbar style */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-accent);
+}
+
+/* Micro-animations and custom effects */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.015); }
+}
+
+.animate-pulse-slow {
+  animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Smooth zoom transition on tables and grid items */
+.hover-lift {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -10px rgba(16, 185, 129, 0.12);
 }
