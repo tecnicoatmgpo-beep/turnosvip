@@ -46,7 +46,8 @@ interface StaffMember {
 
 interface Customer {
   id: string
-  name: string
+  first_name: string
+  last_name: string
   phone: string
   email: string | null
   birthday?: string | null
@@ -184,9 +185,9 @@ export default function AgendaPage() {
       // 5. Fetch Customers
       const { data: customersData } = await supabase
         .from('customers')
-        .select('id, name, phone, email, category, notes')
+        .select('id, first_name, last_name, phone, email, category, notes')
         .eq('tenant_id', tenant.id)
-        .order('name')
+        .order('first_name')
 
       setCustomers(customersData || [])
 
@@ -262,7 +263,7 @@ export default function AgendaPage() {
       setFormData(prev => ({
         ...prev,
         customer_id: customerId,
-        client_name: selectedCustomer.name,
+        client_name: `${selectedCustomer.first_name || ''} ${selectedCustomer.last_name || ''}`.trim(),
         client_phone: selectedCustomer.phone || '',
         client_email: selectedCustomer.email || '',
         total_price: finalPrice.toFixed(2)
@@ -1061,7 +1062,7 @@ export default function AgendaPage() {
               <option value="">-- Ingreso manual (Cliente no registrado) --</option>
               {customers.map(c => (
                 <option key={c.id} value={c.id}>
-                  {c.name} ({c.phone}) - {c.category.toUpperCase()}
+                  {c.first_name} {c.last_name} ({c.phone}) - {c.category.toUpperCase()}
                 </option>
               ))}
             </select>

@@ -6,12 +6,16 @@
 CREATE TABLE IF NOT EXISTS public.customers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
     phone TEXT NOT NULL,
     email TEXT,
     birthday DATE,
     category TEXT NOT NULL CHECK (category IN ('nuevo', 'regular', 'frecuente', 'vip')) DEFAULT 'regular',
     notes TEXT, -- Notas de estética (Tipo de piel, alergias a químicos, parámetros láser, etc.)
+    address TEXT, -- Dirección
+    locality TEXT, -- Localidad
+    province TEXT, -- Provincia
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
