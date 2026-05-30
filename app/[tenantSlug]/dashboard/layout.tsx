@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { Calendar, Store, Users, LogOut, Menu, X, Scissors, User } from 'lucide-react'
+import { Calendar, Store, Users, LogOut, Menu, X, Scissors, User, UserCheck } from 'lucide-react'
 
 export default function TenantDashboardLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
@@ -89,6 +89,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const menuItems = [
     { name: 'Resumen', href: `/${tenantSlug}/dashboard`, icon: Store, moduleKey: 'statistics' },
     { name: 'Agenda / Turnos', href: `/${tenantSlug}/dashboard/agenda`, icon: Calendar, moduleKey: 'agenda' },
+    { name: 'Clientes', href: `/${tenantSlug}/dashboard/clientes`, icon: UserCheck, moduleKey: 'clientes' },
     { name: 'Servicios', href: `/${tenantSlug}/dashboard/servicios`, icon: Scissors, moduleKey: 'servicios' },
     { name: 'Personal (Staff)', href: `/${tenantSlug}/dashboard/staff`, icon: Users, moduleKey: 'staff' },
   ]
@@ -108,6 +109,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
       
       let currentKey = 'statistics'
       if (subpath === 'agenda') currentKey = 'agenda'
+      else if (subpath === 'clientes') currentKey = 'clientes'
       else if (subpath === 'servicios') currentKey = 'servicios'
       else if (subpath === 'staff') currentKey = 'staff'
 

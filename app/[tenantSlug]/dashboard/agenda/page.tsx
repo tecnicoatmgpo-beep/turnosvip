@@ -27,7 +27,9 @@ import {
   Scissors,
   Check,
   X,
-  Filter
+  Filter,
+  Sparkles,
+  Heart
 } from 'lucide-react'
 
 interface Service {
@@ -40,6 +42,16 @@ interface Service {
 interface StaffMember {
   id: string
   email: string
+}
+
+interface Customer {
+  id: string
+  name: string
+  phone: string
+  email: string | null
+  birthday?: string | null
+  category: 'nuevo' | 'regular' | 'frecuente' | 'vip'
+  notes: string | null
 }
 
 interface Appointment {
@@ -61,9 +73,17 @@ interface Appointment {
   users?: {
     email: string
   } | null
+  customer_id?: string | null
 }
 
 type ViewMode = 'day' | 'week' | 'list'
+
+const DISCOUNT_MULTIPLIERS = {
+  vip: 0.15,
+  frecuente: 0.05,
+  nuevo: 0.10,
+  regular: 0.00
+}
 
 export default function AgendaPage() {
   const params = useParams()
@@ -79,6 +99,7 @@ export default function AgendaPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [staff, setStaff] = useState<StaffMember[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
 
   // Views & Filtering
   const [viewMode, setViewMode] = useState<ViewMode>('day')
@@ -103,7 +124,8 @@ export default function AgendaPage() {
     appointment_time: '',
     total_price: '0.00',
     notes: '',
-    status: 'confirmed' as Appointment['status']
+    status: 'confirmed' as Appointment['status'],
+    customer_id: ''
   })
 
   const supabase = createClient()
@@ -150,7 +172,23 @@ export default function AgendaPage() {
         .order('appointment_time', { ascending: true })
 
       if (apptsErr) throw apptsErr
-      setAppointments(apptsData || [])
+      
+      const formattedAppts = (apptsData || []).map((item: any) => ({
+        ...item,
+        services: Array.isArray(item.services) ? item.services[0] : item.services,
+        users: Array.isArray(item.users) ? item.users[0] : item.users
+      })) as Appointment[]
+      
+      setAppointments(formattedAppts)
+
+      // 5. Fetch Customers
+      const { data: customersData } = await supabase
+        .from('customers')
+        .select('id, name, phone, email, category, notes')
+        .eq('tenant_id', tenant.id)
+        .order('name')
+
+      setCustomers(customersData || [])
 
     } catch (err: any) {
       console.error(err)
@@ -190,14 +228,55 @@ export default function AgendaPage() {
     }
   }
 
-  // Handle service change to pre-fill standard price
-  const handleServiceChange = (serviceId: string) => {
+  // Handle service change to pre-fill standard price, applying category discount if customer is selected
+  const handleServiceChange = (serviceId: string, currentCustomerId?: string) => {
     const selectedService = services.find(s => s.id === serviceId)
+    const basePrice = selectedService ? selectedService.price : 0
+    
+    const targetCustomerId = currentCustomerId !== undefined ? currentCustomerId : formData.customer_id
+    const selectedCustomer = customers.find(c => c.id === targetCustomerId)
+    
+    let finalPrice = basePrice
+    if (selectedCustomer) {
+      const discountPercent = DISCOUNT_MULTIPLIERS[selectedCustomer.category] || 0
+      finalPrice = basePrice * (1 - discountPercent)
+    }
+    
     setFormData(prev => ({
       ...prev,
       service_id: serviceId,
-      total_price: selectedService ? selectedService.price.toString() : '0.00'
+      total_price: finalPrice.toFixed(2)
     }))
+  }
+
+  // Handle customer selection to auto-fill details and apply discount
+  const handleCustomerChange = (customerId: string) => {
+    const selectedCustomer = customers.find(c => c.id === customerId)
+    const selectedService = services.find(s => s.id === formData.service_id)
+    const basePrice = selectedService ? selectedService.price : 0
+    
+    if (selectedCustomer) {
+      const discountPercent = DISCOUNT_MULTIPLIERS[selectedCustomer.category] || 0
+      const finalPrice = basePrice * (1 - discountPercent)
+      
+      setFormData(prev => ({
+        ...prev,
+        customer_id: customerId,
+        client_name: selectedCustomer.name,
+        client_phone: selectedCustomer.phone || '',
+        client_email: selectedCustomer.email || '',
+        total_price: finalPrice.toFixed(2)
+      }))
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        customer_id: '',
+        client_name: '',
+        client_phone: '',
+        client_email: '',
+        total_price: basePrice.toFixed(2)
+      }))
+    }
   }
 
   // Open Create Modal
@@ -212,7 +291,8 @@ export default function AgendaPage() {
       appointment_time: formatForDateTimeInput(new Date().toISOString()),
       total_price: services[0]?.price.toString() || '0.00',
       notes: '',
-      status: 'confirmed'
+      status: 'confirmed',
+      customer_id: ''
     })
     setIsModalOpen(true)
   }
@@ -229,7 +309,8 @@ export default function AgendaPage() {
       appointment_time: formatForDateTimeInput(appt.appointment_time),
       total_price: appt.total_price.toString(),
       notes: appt.notes || '',
-      status: appt.status
+      status: appt.status,
+      customer_id: appt.customer_id || ''
     })
     setIsDetailModalOpen(false)
     setIsModalOpen(true)
@@ -288,7 +369,8 @@ export default function AgendaPage() {
       appointment_time: new Date(formData.appointment_time).toISOString(),
       total_price: parseFloat(formData.total_price) || 0.00,
       notes: formData.notes.trim() || null,
-      status: formData.status
+      status: formData.status,
+      customer_id: formData.customer_id || null
     }
 
     try {
@@ -967,18 +1049,64 @@ export default function AgendaPage() {
         title={editingAppointment ? 'Editar Turno' : 'Programar Nuevo Turno'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Nombre del Cliente"
-            placeholder="Ej. Juan Pérez"
-            required
-            value={formData.client_name}
-            onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
-          />
+          <div>
+            <label className="block text-xs font-semibold text-zinc-505 mb-1 dark:text-zinc-400 uppercase tracking-wide">
+              Vincular a Cliente Registrado (Opcional)
+            </label>
+            <select
+              value={formData.customer_id}
+              onChange={(e) => handleCustomerChange(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-white border border-border-custom rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-transparent dark:bg-card-custom dark:border-border-custom dark:text-zinc-100 transition-all cursor-pointer"
+            >
+              <option value="">-- Ingreso manual (Cliente no registrado) --</option>
+              {customers.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.phone}) - {c.category.toUpperCase()}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {formData.customer_id && (
+            (() => {
+              const selectedCustomer = customers.find(c => c.id === formData.customer_id)
+              if (!selectedCustomer) return null
+              const discountPercent = (DISCOUNT_MULTIPLIERS[selectedCustomer.category] || 0) * 100
+              return (
+                <div className="p-3 bg-primary-light/10 dark:bg-primary-light/5 border border-primary/20 rounded-xl space-y-1.5 text-xs text-zinc-705 dark:text-zinc-300">
+                  <div className="flex justify-between items-center font-bold">
+                    <span className="text-primary flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 fill-primary/20" />
+                      Cliente {selectedCustomer.category.toUpperCase()} Detectado
+                    </span>
+                    <span className="bg-primary/20 text-primary dark:bg-primary/30 px-2 py-0.5 rounded-full text-[10px]">
+                      {discountPercent}% Descuento Aplicado automáticamente
+                    </span>
+                  </div>
+                  {selectedCustomer.notes && (
+                    <div className="text-rose-600 dark:text-rose-455 font-medium flex items-start gap-1">
+                      <Heart className="w-3.5 h-3.5 fill-rose-600 dark:fill-rose-455 shrink-0 mt-0.5" />
+                      <span><strong>Notas de Cuidado:</strong> {selectedCustomer.notes}</span>
+                    </div>
+                  )}
+                </div>
+              )
+            })()
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input
+              label="Nombre del Cliente"
+              placeholder="Ej. Juan Pérez"
+              required
+              disabled={!!formData.customer_id}
+              value={formData.client_name}
+              onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+            />
             <Input
               label="Teléfono del Cliente"
               placeholder="Ej. +54 9 11 2345 6789"
+              disabled={!!formData.customer_id}
               value={formData.client_phone}
               onChange={(e) => setFormData({ ...formData, client_phone: e.target.value })}
             />
@@ -986,6 +1114,7 @@ export default function AgendaPage() {
               label="Email del Cliente"
               type="email"
               placeholder="Ej. juan@correo.com"
+              disabled={!!formData.customer_id}
               value={formData.client_email}
               onChange={(e) => setFormData({ ...formData, client_email: e.target.value })}
             />

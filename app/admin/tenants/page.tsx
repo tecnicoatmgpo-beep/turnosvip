@@ -32,6 +32,7 @@ interface EnabledModules {
   statistics: boolean
   marketing: boolean
   whatsapp: boolean
+  clientes: boolean
 }
 
 const DEFAULT_MODULES: EnabledModules = {
@@ -41,6 +42,7 @@ const DEFAULT_MODULES: EnabledModules = {
   statistics: false,
   marketing: false,
   whatsapp: false,
+  clientes: true,
 }
 
 const PLAN_DEFAULTS: Record<string, EnabledModules> = {
@@ -51,6 +53,7 @@ const PLAN_DEFAULTS: Record<string, EnabledModules> = {
     statistics: false,
     marketing: false,
     whatsapp: false,
+    clientes: true,
   },
   pro: {
     agenda: true,
@@ -59,6 +62,7 @@ const PLAN_DEFAULTS: Record<string, EnabledModules> = {
     statistics: true,
     marketing: false,
     whatsapp: false,
+    clientes: true,
   },
   vip: {
     agenda: true,
@@ -67,6 +71,7 @@ const PLAN_DEFAULTS: Record<string, EnabledModules> = {
     statistics: true,
     marketing: true,
     whatsapp: true,
+    clientes: true,
   }
 }
 
@@ -145,6 +150,7 @@ export default function TenantsPage() {
         statistics: existing.statistics ?? false,
         marketing: existing.marketing ?? false,
         whatsapp: existing.whatsapp ?? false,
+        clientes: existing.clientes ?? true,
       })
     } else {
       setModulesConfig(DEFAULT_MODULES)
@@ -850,6 +856,20 @@ export default function TenantsPage() {
                 <div>
                   <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Personal / Staff</span>
                   <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Registro de estilistas y roles de acceso.</p>
+                </div>
+              </label>
+
+              {/* Clientes */}
+              <label className="flex items-start gap-3 p-3 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modulesConfig.clientes}
+                  onChange={(e) => setModulesConfig({ ...modulesConfig, clientes: e.target.checked })}
+                />
+                <div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Fichas Clientes</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Gestión de clientes, historial de visitas y compras.</p>
                 </div>
               </label>
 
