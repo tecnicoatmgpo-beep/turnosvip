@@ -6,14 +6,26 @@ interface ModalProps {
   onClose: () => void
   title: string
   children: React.ReactNode
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl'
 }
 
-export function Modal({ isOpen, onClose, title, children }: ModalProps) {
+const sizeClasses = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl'
+}
+
+export function Modal({ isOpen, onClose, title, children, size = 'lg' }: ModalProps) {
   if (!isOpen) return null
+
+  const maxWidthClass = sizeClasses[size] || 'max-w-lg'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-      <div className="w-full max-w-lg bg-white dark:bg-card-custom border border-border-custom dark:border-border-custom rounded-xl shadow-xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-155">
+      <div className={`w-full ${maxWidthClass} bg-white dark:bg-card-custom border border-border-custom dark:border-border-custom rounded-xl shadow-xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-155`}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border-custom dark:border-border-custom">
           <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{title}</h3>
@@ -30,3 +42,4 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     </div>
   )
 }
+

@@ -613,6 +613,7 @@ export default function ClientesPage() {
         isOpen={isCRUDModalOpen}
         onClose={() => setIsCRUDModalOpen(false)}
         title={editingCustomer ? 'Editar Ficha de Cliente' : 'Registrar Nuevo Cliente'}
+        size="2xl"
       >
         <form onSubmit={handleSubmitCustomer} className="space-y-4">
           {errorMsg && (
@@ -627,6 +628,7 @@ export default function ClientesPage() {
               label="Nombre"
               placeholder="Ej. María"
               required
+              size="sm"
               value={formData.first_name}
               onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
             />
@@ -634,6 +636,7 @@ export default function ClientesPage() {
               label="Apellido"
               placeholder="Ej. González"
               required
+              size="sm"
               value={formData.last_name}
               onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
             />
@@ -641,18 +644,18 @@ export default function ClientesPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-zinc-550 mb-1 dark:text-zinc-400 uppercase tracking-wide">
+              <label className="block text-[10px] font-semibold text-zinc-550 mb-1 dark:text-zinc-400 uppercase tracking-wide">
                 Teléfono / Celular
               </label>
-              <div className="flex rounded-lg overflow-hidden border border-border-custom bg-white dark:bg-card-custom transition-all focus-within:ring-2 focus-within:ring-primary-accent">
-                <span className="inline-flex items-center px-3 bg-zinc-50 dark:bg-zinc-900 border-r border-border-custom text-zinc-505 text-sm font-semibold select-none">
+              <div className="flex rounded-lg overflow-hidden border border-border-custom bg-white dark:bg-card-custom transition-all focus-within:ring-2 focus-within:ring-primary-accent focus-within:border-transparent">
+                <span className="inline-flex items-center px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-900 border-r border-border-custom text-zinc-505 text-xs font-semibold select-none">
                   +54 9
                 </span>
                 <input
                   type="text"
                   placeholder="Ej. 11 9876 5432"
                   required
-                  className="flex-1 min-w-0 px-3 py-2 text-sm bg-transparent border-0 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none"
+                  className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-transparent border-0 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
@@ -662,6 +665,7 @@ export default function ClientesPage() {
               label="Correo electrónico"
               type="email"
               placeholder="Ej. maria@correo.com"
+              size="sm"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
@@ -671,11 +675,13 @@ export default function ClientesPage() {
             <Input
               label="Fecha de Nacimiento"
               type="date"
+              size="sm"
               value={formData.birthday}
               onChange={(e) => setFormData({ ...formData, birthday: e.target.value })}
             />
             <Select
               label="Categoría de Cliente"
+              size="sm"
               options={[
                 { label: 'Regular (Sin descuento)', value: 'regular' },
                 { label: 'Nuevo (10% desc. predeterminado)', value: 'nuevo' },
@@ -699,6 +705,7 @@ export default function ClientesPage() {
               max="100"
               step="0.1"
               required
+              size="sm"
               value={formData.discount_percent}
               onChange={(e) => setFormData({ ...formData, discount_percent: e.target.value })}
             />
@@ -708,11 +715,13 @@ export default function ClientesPage() {
             <Input
               label="Dirección"
               placeholder="Ej. Av. San Martín 123"
+              size="sm"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
             />
             <Select
               label="Localidad"
+              size="sm"
               options={LOCALIDADES_LA_PAMPA}
               value={formData.locality}
               onChange={(e) => setFormData({ ...formData, locality: e.target.value })}
@@ -720,17 +729,18 @@ export default function ClientesPage() {
             <Input
               label="Provincia"
               placeholder="Ej. La Pampa"
+              size="sm"
               value={formData.province}
               onChange={(e) => setFormData({ ...formData, province: e.target.value })}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-zinc-500 mb-1 dark:text-zinc-400 uppercase tracking-wide">
+            <label className="block text-[10px] font-semibold text-zinc-500 mb-1 dark:text-zinc-400 uppercase tracking-wide">
               Notas de Cuidados Especiales y Tipo de Piel
             </label>
             <textarea
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-card-custom border border-border-custom rounded-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-primary-accent min-h-[90px]"
+              className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-card-custom border border-border-custom rounded-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-primary-accent min-h-[80px]"
               placeholder="Ej. Alérgica a fragancias. Piel sensible con rosácea. Parámetros de depilación láser recomendados: Cabezal a 14J."
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
