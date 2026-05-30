@@ -75,6 +75,19 @@ interface Plan {
   name: string
 }
 
+const getRemainingDays = (tenant: Tenant) => {
+  const expirationStr = tenant.status === 'trial' ? tenant.trial_ends_at : tenant.current_period_end
+  if (!expirationStr) return null
+  
+  const expDate = new Date(expirationStr)
+  expDate.setHours(0, 0, 0, 0)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  const diffTime = expDate.getTime() - today.getTime()
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+}
+
 export default function TenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
@@ -449,6 +462,7 @@ export default function TenantsPage() {
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Plan Activo</th>
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Estado</th>
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Membresía</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Días Restantes</th>
                   <th className="px-6 py-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Fin de Ciclo</th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Acciones</th>
                 </tr>
@@ -485,6 +499,40 @@ export default function TenantsPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-zinc-700 dark:text-zinc-300 capitalize">
                       {tenant.subscription_status}
+                    </td>
+                    <td className="px-6 py-4">
+                      {(() => {
+                        const days = getRemainingDays(tenant)
+                        if (days === null) {
+                          return <span className="text-zinc-400 dark:text-zinc-650 font-medium italic text-xs">-</span>
+                        }
+                        if (days <= 0) {
+                          return (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30">
+                              Vencido
+                            </span>
+                          )
+                        }
+                        if (days >= 10) {
+                          return (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30">
+                              {days} {days === 1 ? 'día' : 'días'}
+                            </span>
+                          )
+                        }
+                        if (days >= 5) {
+                          return (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30">
+                              {days} {days === 1 ? 'día' : 'días'}
+                            </span>
+                          )
+                        }
+                        return (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-rose-50 text-rose-750 border-rose-100 dark:bg-rose-950/20 dark:text-rose-455 dark:border-rose-900/30 animate-pulse-slow">
+                            {days} {days === 1 ? 'día' : 'días'}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400">
                       {tenant.status === 'trial' 

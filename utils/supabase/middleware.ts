@@ -88,14 +88,32 @@ export async function updateSession(request: NextRequest) {
       // Resolve tenant UUID by slug
       const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
-        .select('id, status')
+        .select('id, status, current_period_end, trial_ends_at')
         .eq('slug', tenantSlug)
         .single()
 
-      if (tenantError || !tenant || tenant.status === 'suspended') {
+      if (tenantError || !tenant) {
         const url = request.nextUrl.clone()
         url.pathname = '/login'
         url.searchParams.set('error', 'tenant_inactive')
+        return NextResponse.redirect(url)
+      }
+
+      // Expiration check: suspension happens on expiration day at 00:00 hs
+      const expirationStr = tenant.status === 'trial' ? tenant.trial_ends_at : tenant.current_period_end
+      let isExpired = false
+      if (expirationStr) {
+        const expDate = new Date(expirationStr)
+        expDate.setHours(0, 0, 0, 0)
+        const now = new Date()
+        isExpired = now.getTime() >= expDate.getTime()
+      }
+
+      if (tenant.status === 'suspended' || isExpired) {
+        await supabase.auth.signOut()
+        const url = request.nextUrl.clone()
+        url.pathname = '/login'
+        url.searchParams.set('error', isExpired ? 'subscription_expired' : 'tenant_inactive')
         return NextResponse.redirect(url)
       }
 

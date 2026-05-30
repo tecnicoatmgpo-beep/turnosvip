@@ -30,6 +30,11 @@ export default function TenantDashboard() {
     servicesCount: 0,
   })
   const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([])
+  const [subscriptionInfo, setSubscriptionInfo] = useState<{
+    status: string
+    expirationDate: string | null
+    daysRemaining: number
+  } | null>(null)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -40,13 +45,31 @@ export default function TenantDashboard() {
         // 1. Get Tenant ID from Slug
         const { data: tenant } = await supabase
           .from('tenants')
-          .select('id')
+          .select('id, status, trial_ends_at, current_period_end')
           .eq('slug', tenantSlug)
           .single()
 
         if (!tenant) return
 
         const tenantId = tenant.id
+
+        // Calculate subscription days remaining
+        const expirationStr = tenant.status === 'trial' ? tenant.trial_ends_at : tenant.current_period_end
+        let daysRemaining = 0
+        if (expirationStr) {
+          const expDate = new Date(expirationStr)
+          expDate.setHours(0, 0, 0, 0)
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const diffTime = expDate.getTime() - today.getTime()
+          daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        }
+
+        setSubscriptionInfo({
+          status: tenant.status,
+          expirationDate: expirationStr,
+          daysRemaining
+        })
 
         // 2. Fetch Services Count
         const { count: sCount } = await supabase
@@ -130,6 +153,43 @@ export default function TenantDashboard() {
 
   return (
     <div className="space-y-8">
+      {/* Expiration Traffic Light Banner */}
+      {subscriptionInfo && (
+        <div className={`p-4 rounded-xl border flex items-center justify-between shadow-xs transition-all ${
+          subscriptionInfo.daysRemaining >= 10
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-250/50 dark:bg-emerald-950/10 dark:text-emerald-400 dark:border-emerald-900/30'
+            : subscriptionInfo.daysRemaining >= 5
+            ? 'bg-amber-50 text-amber-800 border-amber-250/50 dark:bg-amber-950/10 dark:text-amber-400 dark:border-amber-900/30'
+            : 'bg-rose-50 text-rose-800 border-rose-250/50 dark:bg-rose-950/10 dark:text-rose-455 dark:border-rose-900/30 animate-pulse-slow'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className={`w-3 h-3 rounded-full shrink-0 ${
+              subscriptionInfo.daysRemaining >= 10
+                ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]'
+                : subscriptionInfo.daysRemaining >= 5
+                ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)] animate-pulse'
+                : 'bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-ping'
+            }`} />
+            <div>
+              <p className="font-bold text-sm">
+                {subscriptionInfo.daysRemaining >= 10
+                  ? `Suscripción Activa (${subscriptionInfo.status === 'trial' ? 'Período de Prueba' : 'Plan Habilitado'})`
+                  : subscriptionInfo.daysRemaining >= 5
+                  ? 'Atención: Próximo Vencimiento'
+                  : '¡Alerta de Vencimiento Crítica!'}
+              </p>
+              <p className="text-xs opacity-90 mt-0.5 font-medium">
+                {subscriptionInfo.daysRemaining >= 10
+                  ? `Tu plan expira el ${new Date(subscriptionInfo.expirationDate!).toLocaleDateString('es-AR')}. Quedan ${subscriptionInfo.daysRemaining} días.`
+                  : subscriptionInfo.daysRemaining >= 5
+                  ? `Tu suscripción vencerá en ${subscriptionInfo.daysRemaining} días (${new Date(subscriptionInfo.expirationDate!).toLocaleDateString('es-AR')}). Te recomendamos renovar.`
+                  : `Quedan solo ${subscriptionInfo.daysRemaining} días de acceso (${new Date(subscriptionInfo.expirationDate!).toLocaleDateString('es-AR')}). Evita interrupciones renovando hoy.`}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Resumen Diario</h1>
         <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">Cómo marcha tu jornada hoy.</p>

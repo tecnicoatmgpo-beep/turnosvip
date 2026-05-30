@@ -21,6 +21,8 @@ function LoginForm() {
       setErrorMsg('No tienes permisos para acceder a esta área.')
     } else if (errorParam === 'tenant_inactive') {
       setErrorMsg('El comercio asociado a tu cuenta está inactivo o suspendido.')
+    } else if (errorParam === 'subscription_expired') {
+      setErrorMsg('La suscripción de tu comercio ha vencido. Contacta al superadministrador.')
     }
   }, [searchParams])
 
@@ -56,10 +58,10 @@ function LoginForm() {
         if (profile.role === 'superadmin') {
           router.push('/admin')
         } else if ((profile.role === 'tenant_admin' || profile.role === 'staff') && profile.tenant_id) {
-          // Resolve tenant slug by UUID
+          // Resolve tenant slug and expiration by UUID
           const { data: tenant, error: tenantError } = await supabase
             .from('tenants')
-            .select('slug, status')
+            .select('slug, status, current_period_end, trial_ends_at')
             .eq('id', profile.tenant_id)
             .single()
 
@@ -71,6 +73,18 @@ function LoginForm() {
           if (tenant.status === 'suspended') {
             await supabase.auth.signOut()
             throw new Error('Tu comercio está suspendido. Contacta al superadministrador.')
+          }
+
+          // Expiration check: suspension happens on expiration day at 00:00 hs
+          const expirationStr = tenant.status === 'trial' ? tenant.trial_ends_at : tenant.current_period_end
+          if (expirationStr) {
+            const expDate = new Date(expirationStr)
+            expDate.setHours(0, 0, 0, 0)
+            const now = new Date()
+            if (now.getTime() >= expDate.getTime()) {
+              await supabase.auth.signOut()
+              throw new Error('La suscripción de tu comercio ha vencido. Contacta al superadministrador.')
+            }
           }
 
           router.push(`/${tenant.slug}/dashboard`)
