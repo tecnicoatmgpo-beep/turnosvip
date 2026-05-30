@@ -14,6 +14,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const [tenantName, setTenantName] = useState<string>('Mi Comercio')
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [rawRole, setRawRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [enabledModules, setEnabledModules] = useState<Record<string, boolean>>({
     agenda: true,
@@ -45,6 +46,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
             .single()
           
           if (profile) {
+            setRawRole(profile.role)
             setUserRole(
               profile.role === 'tenant_admin' 
                 ? 'Administrador' 
@@ -100,10 +102,18 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   ]
 
   const filteredMenuItems = menuItems.filter(item => {
-    return enabledModules[item.moduleKey] !== false
+    // 1. Check if module is disabled
+    if (enabledModules[item.moduleKey] === false) return false
+
+    // 2. Hide admin sections if user is staff
+    if (rawRole === 'staff') {
+      return item.moduleKey === 'agenda' || item.moduleKey === 'clientes'
+    }
+
+    return true
   })
 
-  // Redirection guard for disabled modules
+  // Redirection guard for disabled modules and role-based access
   useEffect(() => {
     if (loading) return
 
@@ -118,9 +128,17 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
       else if (subpath === 'servicios') currentKey = 'servicios'
       else if (subpath === 'staff') currentKey = 'staff'
 
-      if (enabledModules[currentKey] === false) {
-        // Find first enabled menu item to redirect to
-        const fallback = menuItems.find(item => enabledModules[item.moduleKey] !== false)
+      const isStaffForbidden = rawRole === 'staff' && (currentKey === 'statistics' || currentKey === 'servicios' || currentKey === 'staff')
+
+      if (enabledModules[currentKey] === false || isStaffForbidden) {
+        // Find first enabled and allowed menu item to redirect to
+        const fallback = menuItems.find(item => {
+          if (enabledModules[item.moduleKey] === false) return false
+          if (rawRole === 'staff') {
+            return item.moduleKey === 'agenda' || item.moduleKey === 'clientes'
+          }
+          return true
+        })
         if (fallback) {
           router.push(fallback.href)
         } else {
@@ -128,7 +146,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
         }
       }
     }
-  }, [pathname, enabledModules, loading])
+  }, [pathname, enabledModules, loading, rawRole])
 
   return (
     <div className="min-h-screen bg-background dark:bg-background text-foreground flex flex-col md:flex-row">

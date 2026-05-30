@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
-import { Plus, Trash2, Search, Users, RefreshCw, XCircle, User, Phone, Mail, Heart, MapPin } from 'lucide-react'
+import { Plus, Edit2, Trash2, Search, Users, RefreshCw, XCircle, User, Phone, Mail, Heart, MapPin } from 'lucide-react'
 
 interface StaffMember {
   id: string
@@ -67,9 +67,11 @@ export default function StaffPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [tenantId, setTenantId] = useState<string | null>(null)
   const [tenantName, setTenantName] = useState<string>('')
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
 
   // Modal controls
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null)
 
   // Form inputs
   const [formData, setFormData] = useState({
@@ -123,6 +125,19 @@ export default function StaffPage() {
 
       if (staffError) throw staffError
       setStaff((staffData || []) as StaffMember[])
+
+      // 3. Get Current User Role
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        if (profile) {
+          setCurrentUserRole(profile.role)
+        }
+      }
     } catch (err: any) {
       console.error(err)
       setErrorMsg(err.message || 'Error al obtener personal.')
@@ -138,6 +153,7 @@ export default function StaffPage() {
   }, [tenantSlug])
 
   const handleOpenAddModal = () => {
+    setEditingStaff(null)
     setFormData({
       username: '',
       password: '',
@@ -150,6 +166,27 @@ export default function StaffPage() {
       locality: 'Santa Rosa',
       province: 'La Pampa',
       specialty: ''
+    })
+    setErrorMsg('')
+    setIsModalOpen(true)
+  }
+
+  const handleOpenEditModal = (member: StaffMember) => {
+    setEditingStaff(member)
+    // Extract username (part before @)
+    const username = member.email.split('@')[0] || ''
+    setFormData({
+      username,
+      password: '', // Optional when editing
+      role: member.role,
+      first_name: member.first_name || '',
+      last_name: member.last_name || '',
+      phone: member.phone || '',
+      personal_email: member.personal_email || '',
+      address: member.address || '',
+      locality: member.locality || 'Santa Rosa',
+      province: member.province || 'La Pampa',
+      specialty: member.specialty || ''
     })
     setErrorMsg('')
     setIsModalOpen(true)
@@ -182,8 +219,13 @@ export default function StaffPage() {
       return
     }
 
-    if (formData.password.length < 6) {
+    if (!editingStaff && formData.password.length < 6) {
       setErrorMsg('La contraseña debe tener al menos 6 caracteres.')
+      return
+    }
+
+    if (editingStaff && formData.password && formData.password.length < 6) {
+      setErrorMsg('La nueva contraseña debe tener al menos 6 caracteres.')
       return
     }
 
@@ -191,30 +233,37 @@ export default function StaffPage() {
     const loginEmail = `${formData.username.trim()}@${cleanDomain}.com`
 
     try {
-      const response = await fetch('/api/tenant/create-staff', {
+      const url = editingStaff ? '/api/tenant/update-staff' : '/api/tenant/create-staff'
+      const payload: any = {
+        email: loginEmail,
+        password: formData.password || null,
+        role: formData.role,
+        tenant_id: tenantId,
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
+        phone: formData.phone.trim(),
+        personal_email: formData.personal_email.trim() || null,
+        address: formData.address.trim(),
+        locality: formData.locality.trim(),
+        province: formData.province.trim(),
+        specialty: formData.specialty.trim()
+      }
+
+      if (editingStaff) {
+        payload.id = editingStaff.id
+      }
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email: loginEmail,
-          password: formData.password,
-          role: formData.role,
-          tenant_id: tenantId,
-          first_name: formData.first_name.trim(),
-          last_name: formData.last_name.trim(),
-          phone: formData.phone.trim(),
-          personal_email: formData.personal_email.trim() || null,
-          address: formData.address.trim(),
-          locality: formData.locality.trim(),
-          province: formData.province.trim(),
-          specialty: formData.specialty.trim()
-        }),
+        body: JSON.stringify(payload),
       })
 
       const result = await response.json()
       if (!response.ok) {
-        throw new Error(result.error || 'Error al registrar el empleado.')
+        throw new Error(result.error || 'Error al guardar el empleado.')
       }
 
       setIsModalOpen(false)
@@ -240,6 +289,26 @@ export default function StaffPage() {
     staff: 'Estilista / Personal',
     superadmin: 'Superadministrador',
     customer: 'Cliente',
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-16 bg-white dark:bg-card-custom border border-border-custom rounded-lg animate-pulse" />
+        <div className="h-40 bg-white dark:bg-card-custom border border-border-custom rounded-lg animate-pulse" />
+      </div>
+    )
+  }
+
+  // Double security check: Block non-admins
+  if (currentUserRole && currentUserRole !== 'tenant_admin' && currentUserRole !== 'superadmin') {
+    return (
+      <div className="bg-white dark:bg-card-custom border border-border-custom rounded-xl p-16 text-center max-w-lg mx-auto">
+        <XCircle className="w-12 h-12 text-rose-600 mx-auto mb-4" />
+        <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-lg">Acceso Denegado</h3>
+        <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-2">No tienes los permisos administrativos necesarios para acceder a esta sección.</p>
+      </div>
+    )
   }
 
   return (
@@ -273,13 +342,7 @@ export default function StaffPage() {
       </div>
 
       {/* Staff list table */}
-      {loading ? (
-        <div className="space-y-4">
-          {[1, 2].map(i => (
-            <div key={i} className="h-16 bg-white dark:bg-card-custom border border-border-custom rounded-lg animate-pulse" />
-          ))}
-        </div>
-      ) : filteredStaff.length === 0 ? (
+      {filteredStaff.length === 0 ? (
         <div className="bg-white dark:bg-card-custom border border-border-custom rounded-xl p-12 text-center">
           <Users className="w-12 h-12 text-primary/40 mx-auto mb-4" />
           <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-base">No se encontraron empleados</h3>
@@ -345,7 +408,15 @@ export default function StaffPage() {
                         </>
                       ) : '-'}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEditModal(member)}
+                        className="hover:border-primary hover:text-primary transition-all duration-150 cursor-pointer"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -363,11 +434,11 @@ export default function StaffPage() {
         </div>
       )}
 
-      {/* Add Staff Modal */}
+      {/* Add / Edit Staff Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Registrar Personal de Equipo"
+        title={editingStaff ? 'Editar Personal de Equipo' : 'Registrar Personal de Equipo'}
         size="2xl"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -490,8 +561,8 @@ export default function StaffPage() {
               <Input
                 label="Contraseña Temporal"
                 type="password"
-                placeholder="Mínimo 6 caracteres"
-                required
+                placeholder={editingStaff ? "Dejar vacío para no cambiar" : "Mínimo 6 caracteres"}
+                required={!editingStaff}
                 size="sm"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -504,7 +575,7 @@ export default function StaffPage() {
               Cancelar
             </Button>
             <Button type="submit">
-              Registrar Personal
+              {editingStaff ? 'Guardar Cambios' : 'Registrar Personal'}
             </Button>
           </div>
         </form>

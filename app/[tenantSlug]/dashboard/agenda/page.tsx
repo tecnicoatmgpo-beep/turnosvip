@@ -90,6 +90,7 @@ export default function AgendaPage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [tenantId, setTenantId] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
   
   // Data
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -186,6 +187,18 @@ export default function AgendaPage() {
 
       setCustomers(customersData || [])
 
+      // 6. Fetch User Role
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        if (profile) {
+          setUserRole(profile.role)
+        }
+      }
     } catch (err: any) {
       console.error(err)
       setErrorMsg(err.message || 'Error al cargar los datos de la agenda.')
@@ -875,14 +888,16 @@ export default function AgendaPage() {
                             >
                               <Edit2 className="w-4 h-4" />
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteAppointment(appt.id)}
-                              className="border-rose-200 text-rose-600 dark:border-rose-900/40 dark:text-rose-455 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {(userRole === 'tenant_admin' || userRole === 'superadmin') && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteAppointment(appt.id)}
+                                className="border-rose-200 text-rose-600 dark:border-rose-900/40 dark:text-rose-455 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1025,14 +1040,16 @@ export default function AgendaPage() {
                 <Edit2 className="w-3.5 h-3.5" />
                 Editar
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleDeleteAppointment(selectedAppointment.id)}
-                className="border-rose-200 text-rose-600 dark:border-rose-900/40 dark:text-rose-455 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
+              {(userRole === 'tenant_admin' || userRole === 'superadmin') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDeleteAppointment(selectedAppointment.id)}
+                  className="border-rose-200 text-rose-600 dark:border-rose-900/40 dark:text-rose-455 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              )}
             </div>
           </div>
         )}

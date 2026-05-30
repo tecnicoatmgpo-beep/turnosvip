@@ -132,6 +132,7 @@ export default function ClientesPage() {
   
   // Data Lists
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [userRole, setUserRole] = useState<string | null>(null)
   
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('')
@@ -209,6 +210,19 @@ export default function ClientesPage() {
 
       if (customersErr) throw customersErr
       setCustomers(customersData || [])
+
+      // 3. Get User Role
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        if (profile) {
+          setUserRole(profile.role)
+        }
+      }
     } catch (err: any) {
       console.error(err)
       setErrorMsg(err.message || 'Error al obtener listado de clientes.')
@@ -591,14 +605,16 @@ export default function ClientesPage() {
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteCustomer(customer.id)}
-                        className="border-rose-200 text-rose-600 dark:border-rose-900/40 dark:text-rose-455 hover:bg-rose-50 dark:hover:bg-rose-950/20 cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {(userRole === 'tenant_admin' || userRole === 'superadmin') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteCustomer(customer.id)}
+                          className="border-rose-200 text-rose-600 dark:border-rose-900/40 dark:text-rose-455 hover:bg-rose-50 dark:hover:bg-rose-950/20 cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}
