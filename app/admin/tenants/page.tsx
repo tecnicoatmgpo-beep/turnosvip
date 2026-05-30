@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
-import { Edit2, Plus, Search, ShieldAlert, CheckCircle, RefreshCw, XCircle, Store, UserPlus } from 'lucide-react'
+import { Edit2, Plus, Search, ShieldAlert, CheckCircle, RefreshCw, XCircle, Store, UserPlus, Sliders } from 'lucide-react'
 
 interface Tenant {
   id: string
@@ -18,9 +18,56 @@ interface Tenant {
   trial_ends_at: string | null
   current_period_end: string | null
   created_at: string
+  enabled_modules?: any
   subscription_plans?: {
-    name: string
+    name: string;
+    slug: string;
   } | null
+}
+
+interface EnabledModules {
+  agenda: boolean
+  servicios: boolean
+  staff: boolean
+  statistics: boolean
+  marketing: boolean
+  whatsapp: boolean
+}
+
+const DEFAULT_MODULES: EnabledModules = {
+  agenda: true,
+  servicios: true,
+  staff: true,
+  statistics: false,
+  marketing: false,
+  whatsapp: false,
+}
+
+const PLAN_DEFAULTS: Record<string, EnabledModules> = {
+  essential: {
+    agenda: true,
+    servicios: true,
+    staff: true,
+    statistics: false,
+    marketing: false,
+    whatsapp: false,
+  },
+  pro: {
+    agenda: true,
+    servicios: true,
+    staff: true,
+    statistics: true,
+    marketing: false,
+    whatsapp: false,
+  },
+  vip: {
+    agenda: true,
+    servicios: true,
+    staff: true,
+    statistics: true,
+    marketing: true,
+    whatsapp: true,
+  }
 }
 
 interface Plan {
@@ -63,7 +110,80 @@ export default function TenantsPage() {
   const [userErrorMsg, setUserErrorMsg] = useState('')
   const [userSuccessMsg, setUserSuccessMsg] = useState('')
 
+  // Module Config Modal
+  const [isModulesModalOpen, setIsModulesModalOpen] = useState(false)
+  const [selectedTenantForModules, setSelectedTenantForModules] = useState<Tenant | null>(null)
+  const [modulesConfig, setModulesConfig] = useState<EnabledModules>(DEFAULT_MODULES)
+  const [modulesErrorMsg, setModulesErrorMsg] = useState('')
+  const [modulesSuccessMsg, setModulesSuccessMsg] = useState('')
+
   const supabase = createClient()
+
+  const handleOpenModulesModal = (tenant: Tenant) => {
+    setSelectedTenantForModules(tenant)
+    
+    // Parse existing enabled_modules, or fall back to default
+    const existing = tenant.enabled_modules as any
+    if (existing && typeof existing === 'object') {
+      setModulesConfig({
+        agenda: existing.agenda ?? true,
+        servicios: existing.servicios ?? true,
+        staff: existing.staff ?? true,
+        statistics: existing.statistics ?? false,
+        marketing: existing.marketing ?? false,
+        whatsapp: existing.whatsapp ?? false,
+      })
+    } else {
+      setModulesConfig(DEFAULT_MODULES)
+    }
+
+    setModulesErrorMsg('')
+    setModulesSuccessMsg('')
+    setIsModulesModalOpen(true)
+  }
+
+  const handleResetToPlanDefaults = () => {
+    if (!selectedTenantForModules) return
+    const planSlug = selectedTenantForModules.subscription_plans?.slug || 'essential'
+    const defaults = PLAN_DEFAULTS[planSlug] || PLAN_DEFAULTS['essential']
+    setModulesConfig(defaults)
+    setModulesSuccessMsg(`Valores cargados para el plan: ${selectedTenantForModules.subscription_plans?.name || 'Básico'}`)
+    setTimeout(() => setModulesSuccessMsg(''), 3000)
+  }
+
+  const handleSaveModules = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setModulesErrorMsg('')
+    setModulesSuccessMsg('')
+
+    if (!selectedTenantForModules) return
+
+    try {
+      const { error } = await supabase
+        .from('tenants')
+        .update({
+          enabled_modules: modulesConfig
+        })
+        .eq('id', selectedTenantForModules.id)
+
+      if (error) throw error
+
+      // Update local state to reflect changes instantly
+      setTenants(prev => prev.map(t => 
+        t.id === selectedTenantForModules.id 
+          ? { ...t, enabled_modules: modulesConfig } 
+          : t
+      ))
+
+      setModulesSuccessMsg('Módulos actualizados con éxito.')
+      setTimeout(() => {
+        setIsModulesModalOpen(false)
+        setModulesSuccessMsg('')
+      }, 1500)
+    } catch (err: any) {
+      setModulesErrorMsg(err.message || 'Error al guardar configuración de módulos.')
+    }
+  }
 
   const handleOpenUserModal = (tenant: Tenant) => {
     setSelectedTenantForUser(tenant)
@@ -124,7 +244,7 @@ export default function TenantsPage() {
     try {
       const { data: tenantsData, error: tenantsError } = await supabase
         .from('tenants')
-        .select('*, subscription_plans(name)')
+        .select('*, subscription_plans(name, slug)')
         .order('created_at', { ascending: false })
 
       if (tenantsError) throw tenantsError
@@ -372,12 +492,21 @@ export default function TenantsPage() {
                         : (tenant.current_period_end ? new Date(tenant.current_period_end).toLocaleDateString() : '-')
                       }
                     </td>
-                    <td className="px-6 py-4 text-right space-x-2">
+                    <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenModulesModal(tenant)}
+                        className="border-emerald-200 text-emerald-700 hover:bg-emerald-55 dark:border-emerald-900/40 dark:text-emerald-400 dark:hover:bg-emerald-950/20 cursor-pointer"
+                        title="Configurar Módulos"
+                      >
+                        <Sliders className="w-4 h-4" />
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleOpenUserModal(tenant)}
-                        className="border-indigo-250 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900/40 dark:text-indigo-400 dark:hover:bg-indigo-950/20 cursor-pointer"
+                        className="border-indigo-250 text-indigo-650 hover:bg-indigo-50 dark:border-indigo-900/40 dark:text-indigo-400 dark:hover:bg-indigo-950/20 cursor-pointer"
                         title="Crear Usuario"
                       >
                         <UserPlus className="w-4 h-4" />
@@ -586,6 +715,146 @@ export default function TenantsPage() {
             </Button>
             <Button type="submit">
               Crear Usuario
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal dialog for Module Configuration */}
+      <Modal
+        isOpen={isModulesModalOpen}
+        onClose={() => setIsModulesModalOpen(false)}
+        title={`Configurar Módulos Habilitados - ${selectedTenantForModules?.name}`}
+      >
+        <form onSubmit={handleSaveModules} className="space-y-6">
+          {modulesErrorMsg && (
+            <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg text-rose-600 text-xs flex items-start gap-2 dark:bg-rose-950/20 dark:border-rose-950/30 dark:text-rose-400">
+              <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{modulesErrorMsg}</span>
+            </div>
+          )}
+
+          {modulesSuccessMsg && (
+            <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-700 text-xs flex items-start gap-2 dark:bg-emerald-950/20 dark:border-emerald-950/30 dark:text-emerald-400">
+              <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{modulesSuccessMsg}</span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-900/50 p-4 border border-border-custom rounded-xl">
+            <div>
+              <span className="text-xs text-zinc-400 uppercase font-bold tracking-wider">Plan Activo</span>
+              <p className="font-bold text-sm text-zinc-800 dark:text-zinc-200">
+                {selectedTenantForModules?.subscription_plans?.name || 'Plan Básico (Essential)'}
+              </p>
+            </div>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={handleResetToPlanDefaults}
+              className="text-xs shrink-0 flex items-center gap-1.5"
+            >
+              Restaurar por Plan
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Módulos del Sistema</h4>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Agenda */}
+              <label className="flex items-start gap-3 p-3 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modulesConfig.agenda}
+                  onChange={(e) => setModulesConfig({ ...modulesConfig, agenda: e.target.checked })}
+                />
+                <div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Agenda / Turnos</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Calendario de turnos y agendamientos.</p>
+                </div>
+              </label>
+
+              {/* Servicios */}
+              <label className="flex items-start gap-3 p-3 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modulesConfig.servicios}
+                  onChange={(e) => setModulesConfig({ ...modulesConfig, servicios: e.target.checked })}
+                />
+                <div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Catálogo Servicios</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Tratamientos, cortes y precios del salón.</p>
+                </div>
+              </label>
+
+              {/* Staff */}
+              <label className="flex items-start gap-3 p-3 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modulesConfig.staff}
+                  onChange={(e) => setModulesConfig({ ...modulesConfig, staff: e.target.checked })}
+                />
+                <div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Personal / Staff</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Registro de estilistas y roles de acceso.</p>
+                </div>
+              </label>
+
+              {/* Statistics */}
+              <label className="flex items-start gap-3 p-3 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modulesConfig.statistics}
+                  onChange={(e) => setModulesConfig({ ...modulesConfig, statistics: e.target.checked })}
+                />
+                <div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Estadísticas / Reportes</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Resumen diario, recaudación y ocupación.</p>
+                </div>
+              </label>
+
+              {/* Marketing */}
+              <label className="flex items-start gap-3 p-3 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modulesConfig.marketing}
+                  onChange={(e) => setModulesConfig({ ...modulesConfig, marketing: e.target.checked })}
+                />
+                <div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Marketing y Promos</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Herramientas de fidelización y campañas.</p>
+                </div>
+              </label>
+
+              {/* Whatsapp */}
+              <label className="flex items-start gap-3 p-3 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modulesConfig.whatsapp}
+                  onChange={(e) => setModulesConfig({ ...modulesConfig, whatsapp: e.target.checked })}
+                />
+                <div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Recordatorios WhatsApp</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Notificaciones automatizadas de turnos.</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-custom">
+            <Button type="button" variant="outline" onClick={() => setIsModulesModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit">
+              Guardar Configuración
             </Button>
           </div>
         </form>

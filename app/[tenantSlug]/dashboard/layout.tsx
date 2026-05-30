@@ -14,45 +14,64 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const [tenantName, setTenantName] = useState<string>('Mi Comercio')
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [enabledModules, setEnabledModules] = useState<Record<string, boolean>>({
+    agenda: true,
+    servicios: true,
+    staff: true,
+    statistics: true,
+    marketing: false,
+    whatsapp: false
+  })
 
   const tenantSlug = params.tenantSlug as string
 
   useEffect(() => {
     const fetchTenantAndUser = async () => {
-      const supabase = createClient()
-      
-      // Get current user details
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUserEmail(user.email ?? 'Empleado')
+      setLoading(true)
+      try {
+        const supabase = createClient()
         
-        // Get user role
-        const { data: profile } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', user.id)
+        // Get current user details
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          setUserEmail(user.email ?? 'Empleado')
+          
+          // Get user role
+          const { data: profile } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+          
+          if (profile) {
+            setUserRole(
+              profile.role === 'tenant_admin' 
+                ? 'Administrador' 
+                : profile.role === 'superadmin' 
+                ? 'Superadmin' 
+                : 'Personal'
+            )
+          }
+        }
+
+        // Get tenant name and modules configuration
+        const { data: tenant } = await supabase
+          .from('tenants')
+          .select('name, enabled_modules')
+          .eq('slug', tenantSlug)
           .single()
         
-        if (profile) {
-          setUserRole(
-            profile.role === 'tenant_admin' 
-              ? 'Administrador' 
-              : profile.role === 'superadmin' 
-              ? 'Superadmin' 
-              : 'Personal'
-          )
+        if (tenant) {
+          setTenantName(tenant.name)
+          if (tenant.enabled_modules && typeof tenant.enabled_modules === 'object') {
+            setEnabledModules(tenant.enabled_modules as Record<string, boolean>)
+          }
         }
-      }
-
-      // Get tenant name
-      const { data: tenant } = await supabase
-        .from('tenants')
-        .select('name')
-        .eq('slug', tenantSlug)
-        .single()
-      
-      if (tenant) {
-        setTenantName(tenant.name)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setLoading(false)
       }
     }
 
@@ -68,11 +87,41 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   }
 
   const menuItems = [
-    { name: 'Resumen', href: `/${tenantSlug}/dashboard`, icon: Store },
-    { name: 'Agenda / Turnos', href: `/${tenantSlug}/dashboard/agenda`, icon: Calendar },
-    { name: 'Servicios', href: `/${tenantSlug}/dashboard/servicios`, icon: Scissors },
-    { name: 'Personal (Staff)', href: `/${tenantSlug}/dashboard/staff`, icon: Users },
+    { name: 'Resumen', href: `/${tenantSlug}/dashboard`, icon: Store, moduleKey: 'statistics' },
+    { name: 'Agenda / Turnos', href: `/${tenantSlug}/dashboard/agenda`, icon: Calendar, moduleKey: 'agenda' },
+    { name: 'Servicios', href: `/${tenantSlug}/dashboard/servicios`, icon: Scissors, moduleKey: 'servicios' },
+    { name: 'Personal (Staff)', href: `/${tenantSlug}/dashboard/staff`, icon: Users, moduleKey: 'staff' },
   ]
+
+  const filteredMenuItems = menuItems.filter(item => {
+    return enabledModules[item.moduleKey] !== false
+  })
+
+  // Redirection guard for disabled modules
+  useEffect(() => {
+    if (loading) return
+
+    const pathParts = pathname.split('/').filter(Boolean)
+    // pathParts: [tenantSlug, 'dashboard', 'agenda']
+    if (pathParts.length >= 2 && pathParts[1] === 'dashboard') {
+      const subpath = pathParts[2] // undefined, 'agenda', 'servicios', 'staff'
+      
+      let currentKey = 'statistics'
+      if (subpath === 'agenda') currentKey = 'agenda'
+      else if (subpath === 'servicios') currentKey = 'servicios'
+      else if (subpath === 'staff') currentKey = 'staff'
+
+      if (enabledModules[currentKey] === false) {
+        // Find first enabled menu item to redirect to
+        const fallback = menuItems.find(item => enabledModules[item.moduleKey] !== false)
+        if (fallback) {
+          router.push(fallback.href)
+        } else {
+          router.push('/login')
+        }
+      }
+    }
+  }, [pathname, enabledModules, loading])
 
   return (
     <div className="min-h-screen bg-background dark:bg-background text-foreground flex flex-col md:flex-row">
@@ -108,7 +157,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
           </div>
 
           <nav className="space-y-1">
-            {menuItems.map((item) => {
+            {filteredMenuItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
               return (
