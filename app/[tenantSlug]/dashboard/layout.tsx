@@ -37,10 +37,10 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
         if (user) {
           setUserEmail(user.email ?? 'Empleado')
           
-          // Get user role
+          // Get user role & profile details
           const { data: profile } = await supabase
             .from('users')
-            .select('role')
+            .select('role, first_name, last_name')
             .eq('id', user.id)
             .single()
           
@@ -52,6 +52,11 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
                 ? 'Superadmin' 
                 : 'Personal'
             )
+            if (profile.first_name || profile.last_name) {
+              setUserEmail(`${profile.first_name || ''} ${profile.last_name || ''}`.trim())
+            } else {
+              setUserEmail(user.email ?? 'Empleado')
+            }
           }
         }
 

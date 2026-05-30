@@ -24,10 +24,23 @@ export async function POST(request: Request) {
 
     // 2. Parse request body
     const body = await request.json()
-    const { email, password, role, tenant_id } = body
+    const { 
+      email, 
+      password, 
+      role, 
+      tenant_id,
+      first_name,
+      last_name,
+      phone,
+      personal_email,
+      address,
+      locality,
+      province,
+      specialty
+    } = body
 
-    if (!email || !password || !role || !tenant_id) {
-      return NextResponse.json({ error: 'Todos los campos son obligatorios.' }, { status: 400 })
+    if (!email || !password || !role || !tenant_id || !first_name || !last_name || !phone || !address || !locality || !province || !specialty) {
+      return NextResponse.json({ error: 'Faltan campos obligatorios para el perfil del profesional.' }, { status: 400 })
     }
 
     // 3. Authorization check: Must be superadmin, or tenant_admin of the same tenant
@@ -54,6 +67,27 @@ export async function POST(request: Request) {
 
     if (authError) {
       return NextResponse.json({ error: authError.message }, { status: 500 })
+    }
+
+    // 6. Update user profile in public.users with extra staff details
+    const { error: profileError } = await adminSupabase
+      .from('users')
+      .update({
+        first_name: first_name.trim(),
+        last_name: last_name.trim(),
+        phone: phone.trim(),
+        personal_email: personal_email?.trim() || null,
+        address: address.trim(),
+        locality: locality.trim(),
+        province: province.trim(),
+        specialty: specialty.trim()
+      })
+      .eq('id', authUser.user.id)
+
+    if (profileError) {
+      // Rollback Auth user creation if profile insert/update fails
+      await adminSupabase.auth.admin.deleteUser(authUser.user.id)
+      return NextResponse.json({ error: `Error al registrar perfil: ${profileError.message}` }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, user: authUser.user })

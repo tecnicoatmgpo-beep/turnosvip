@@ -7,14 +7,55 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
-import { Plus, Trash2, Search, Users, RefreshCw, XCircle } from 'lucide-react'
+import { Plus, Trash2, Search, Users, RefreshCw, XCircle, User, Phone, Mail, Heart, MapPin } from 'lucide-react'
 
 interface StaffMember {
   id: string
   email: string
   role: 'tenant_admin' | 'staff' | 'superadmin' | 'customer'
+  first_name: string | null
+  last_name: string | null
+  phone: string | null
+  personal_email: string | null
+  address: string | null
+  locality: string | null
+  province: string | null
+  specialty: string | null
   created_at: string
 }
+
+const LOCALIDADES_LA_PAMPA = [
+  { label: 'Santa Rosa', value: 'Santa Rosa' },
+  { label: 'General Pico', value: 'General Pico' },
+  { label: 'Toay', value: 'Toay' },
+  { label: 'Realicó', value: 'Realicó' },
+  { label: 'Eduardo Castex', value: 'Eduardo Castex' },
+  { label: '25 de Mayo', value: '25 de Mayo' },
+  { label: 'Intendente Alvear', value: 'Intendente Alvear' },
+  { label: 'Victorica', value: 'Victorica' },
+  { label: 'Guatraché', value: 'Guatraché' },
+  { label: 'Macachín', value: 'Macachín' },
+  { label: 'Catriló', value: 'Catriló' },
+  { label: 'General Acha', value: 'General Acha' },
+  { label: 'Quemú Quemú', value: 'Quemú Quemú' },
+  { label: 'Ingeniero Luiggi', value: 'Ingeniero Luiggi' },
+  { label: 'Colonia Barón', value: 'Colonia Barón' },
+  { label: 'General San Martín', value: 'General San Martín' },
+  { label: 'Alpachiri', value: 'Alpachiri' },
+  { label: 'Winifreda', value: 'Winifreda' },
+  { label: 'Trenel', value: 'Trenel' },
+  { label: 'Rancul', value: 'Rancul' },
+  { label: 'Jacinto Arauz', value: 'Jacinto Arauz' },
+  { label: 'Santa Isabel', value: 'Santa Isabel' },
+  { label: 'Lonquimay', value: 'Lonquimay' },
+  { label: 'Anguil', value: 'Anguil' },
+  { label: 'Miguel Riglos', value: 'Miguel Riglos' },
+  { label: 'Doblas', value: 'Doblas' },
+  { label: 'Bernasconi', value: 'Bernasconi' },
+  { label: 'Caleufú', value: 'Caleufú' },
+  { label: 'La Adela', value: 'La Adela' },
+  { label: 'Otra (Fuera de La Pampa)', value: 'Otra' }
+]
 
 export default function StaffPage() {
   const params = useParams()
@@ -25,43 +66,63 @@ export default function StaffPage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [tenantId, setTenantId] = useState<string | null>(null)
+  const [tenantName, setTenantName] = useState<string>('')
 
   // Modal controls
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Form inputs
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: '',
     role: 'staff' as StaffMember['role'],
+    first_name: '',
+    last_name: '',
+    phone: '',
+    personal_email: '',
+    address: '',
+    locality: 'Santa Rosa',
+    province: 'La Pampa',
+    specialty: ''
   })
 
   const supabase = createClient()
+
+  // Clean and slugify tenant name to create email domain
+  const computeDomain = () => {
+    if (!tenantName) return 'comercio'
+    return tenantName
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Remove accents
+      .replace(/[^a-z0-9]/g, "")      // Keep only alphanumeric
+  }
 
   const fetchStaff = async () => {
     setLoading(true)
     setErrorMsg('')
     try {
-      // 1. Get Tenant ID
+      // 1. Get Tenant Details
       const { data: tenant } = await supabase
         .from('tenants')
-        .select('id')
+        .select('id, name')
         .eq('slug', tenantSlug)
         .single()
 
       if (!tenant) throw new Error('Comercio no encontrado')
       setTenantId(tenant.id)
+      setTenantName(tenant.name)
 
       // 2. Fetch staff for this tenant
       const { data: staffData, error: staffError } = await supabase
         .from('users')
-        .select('id, email, role, created_at')
+        .select('id, email, role, first_name, last_name, phone, personal_email, address, locality, province, specialty, created_at')
         .eq('tenant_id', tenant.id)
         .in('role', ['tenant_admin', 'staff'])
         .order('created_at')
 
       if (staffError) throw staffError
-      setStaff(staffData || [])
+      setStaff((staffData || []) as StaffMember[])
     } catch (err: any) {
       console.error(err)
       setErrorMsg(err.message || 'Error al obtener personal.')
@@ -78,9 +139,17 @@ export default function StaffPage() {
 
   const handleOpenAddModal = () => {
     setFormData({
-      email: '',
+      username: '',
       password: '',
       role: 'staff',
+      first_name: '',
+      last_name: '',
+      phone: '',
+      personal_email: '',
+      address: '',
+      locality: 'Santa Rosa',
+      province: 'La Pampa',
+      specialty: ''
     })
     setErrorMsg('')
     setIsModalOpen(true)
@@ -118,6 +187,9 @@ export default function StaffPage() {
       return
     }
 
+    const cleanDomain = computeDomain()
+    const loginEmail = `${formData.username.trim()}@${cleanDomain}.com`
+
     try {
       const response = await fetch('/api/tenant/create-staff', {
         method: 'POST',
@@ -125,10 +197,18 @@ export default function StaffPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: formData.email.trim(),
+          email: loginEmail,
           password: formData.password,
           role: formData.role,
           tenant_id: tenantId,
+          first_name: formData.first_name.trim(),
+          last_name: formData.last_name.trim(),
+          phone: formData.phone.trim(),
+          personal_email: formData.personal_email.trim() || null,
+          address: formData.address.trim(),
+          locality: formData.locality.trim(),
+          province: formData.province.trim(),
+          specialty: formData.specialty.trim()
         }),
       })
 
@@ -144,9 +224,16 @@ export default function StaffPage() {
     }
   }
 
-  const filteredStaff = staff.filter(s => 
-    s.email.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredStaff = staff.filter(s => {
+    const search = searchQuery.toLowerCase()
+    const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase()
+    return (
+      s.email.toLowerCase().includes(search) ||
+      fullName.includes(search) ||
+      (s.specialty && s.specialty.toLowerCase().includes(search)) ||
+      (s.phone && s.phone.includes(search))
+    )
+  })
 
   const roleLabels = {
     tenant_admin: 'Administrador de Salón',
@@ -160,7 +247,7 @@ export default function StaffPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Equipo de Trabajo (Staff)</h1>
-          <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">Administra los profesionales del salón y sus niveles de acceso al panel.</p>
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">Administra los profesionales del salón, sus especialidades y sus cuentas de acceso.</p>
         </div>
         <Button onClick={handleOpenAddModal} className="shrink-0 flex items-center gap-2">
           <Plus className="w-4 h-4" />
@@ -174,7 +261,7 @@ export default function StaffPage() {
           <Search className="absolute left-3 top-3.5 h-4 w-4 text-zinc-400" />
           <input
             type="text"
-            placeholder="Buscar por correo electrónico..."
+            placeholder="Buscar por nombre, especialidad o login..."
             className="w-full pl-9 pr-4 py-2.5 text-sm bg-white dark:bg-card-custom border border-border-custom rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent dark:text-zinc-50 placeholder-zinc-400 transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -204,29 +291,59 @@ export default function StaffPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-border-custom bg-zinc-50/50 dark:bg-primary-light/10 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                  <th className="px-6 py-4">Correo Electrónico</th>
-                  <th className="px-6 py-4">Rol / Nivel de Acceso</th>
-                  <th className="px-6 py-4">Fecha de Alta</th>
+                  <th className="px-6 py-4">Profesional</th>
+                  <th className="px-6 py-4">Contacto</th>
+                  <th className="px-6 py-4">Usuario de Login</th>
+                  <th className="px-6 py-4">Rol / Nivel</th>
+                  <th className="px-6 py-4">Ubicación</th>
                   <th className="px-6 py-4 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-custom text-sm">
                 {filteredStaff.map((member) => (
                   <tr key={member.id} className="hover:bg-primary-light/20 dark:hover:bg-primary-light/10 transition-colors">
-                    <td className="px-6 py-4 font-medium text-zinc-900 dark:text-zinc-100">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-primary-light text-primary dark:bg-primary-light/25 dark:text-primary-hover flex items-center justify-center font-bold text-sm">
+                          {((member.first_name?.[0] || '') + (member.last_name?.[0] || '')).toUpperCase() || 'P'}
+                        </div>
+                        <div>
+                          <div className="font-bold text-zinc-900 dark:text-zinc-100">
+                            {member.first_name && member.last_name 
+                              ? `${member.first_name} ${member.last_name}` 
+                              : 'Sin perfil completo'}
+                          </div>
+                          {member.specialty && (
+                            <div className="text-xs text-primary-accent font-semibold mt-0.5">
+                              {member.specialty}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-zinc-700 dark:text-zinc-300 font-semibold">{member.phone || '-'}</div>
+                      {member.personal_email && <div className="text-xs text-zinc-400 dark:text-zinc-500">{member.personal_email}</div>}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-zinc-650 dark:text-zinc-400 text-xs">
                       {member.email}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                         member.role === 'tenant_admin'
-                          ? 'bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-950/20 dark:text-indigo-400'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400'
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-150 dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-900/50'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-150 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50'
                       }`}>
                         {roleLabels[member.role] || member.role}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-zinc-500 dark:text-zinc-400">
-                      {new Date(member.created_at).toLocaleDateString()}
+                    <td className="px-6 py-4 text-xs text-zinc-500 dark:text-zinc-400">
+                      {member.address ? (
+                        <>
+                          <div className="font-medium text-zinc-700 dark:text-zinc-300">{member.address}</div>
+                          <div className="text-[10px] text-zinc-400 dark:text-zinc-500">{member.locality}, {member.province}</div>
+                        </>
+                      ) : '-'}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <Button
@@ -251,6 +368,7 @@ export default function StaffPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title="Registrar Personal de Equipo"
+        size="2xl"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           {errorMsg && (
@@ -260,33 +378,126 @@ export default function StaffPage() {
             </div>
           )}
 
-          <Input
-            label="Correo electrónico del Empleado"
-            type="email"
-            placeholder="ejemplo@salon.com"
-            required
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          />
+          {/* Personal Info */}
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Nombre"
+              placeholder="Ej. Carlos"
+              required
+              size="sm"
+              value={formData.first_name}
+              onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+            />
+            <Input
+              label="Apellido"
+              placeholder="Ej. Gómez"
+              required
+              size="sm"
+              value={formData.last_name}
+              onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+            />
+          </div>
 
-          <Input
-            label="Contraseña Temporal"
-            type="password"
-            placeholder="Mínimo 6 caracteres"
-            required
-            value={formData.password}
-            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Teléfono"
+              placeholder="Ej. 2954 123456"
+              required
+              size="sm"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            />
+            <Input
+              label="Correo electrónico de contacto (Opcional)"
+              type="email"
+              placeholder="Ej. carlos@personal.com"
+              size="sm"
+              value={formData.personal_email}
+              onChange={(e) => setFormData({ ...formData, personal_email: e.target.value })}
+            />
+          </div>
 
-          <Select
-            label="Rol de Trabajo"
-            options={[
-              { label: 'Estilista / Personal (Acceso restringido)', value: 'staff' },
-              { label: 'Administrador de Salón (Acceso completo)', value: 'tenant_admin' },
-            ]}
-            value={formData.role}
-            onChange={(e) => setFormData({ ...formData, role: e.target.value as StaffMember['role'] })}
-          />
+          <div className="grid grid-cols-3 gap-4">
+            <Input
+              label="Dirección"
+              placeholder="Ej. Av. San Martín 123"
+              required
+              size="sm"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            />
+            <Select
+              label="Localidad"
+              size="sm"
+              options={LOCALIDADES_LA_PAMPA}
+              value={formData.locality}
+              onChange={(e) => setFormData({ ...formData, locality: e.target.value })}
+            />
+            <Input
+              label="Provincia"
+              placeholder="Ej. La Pampa"
+              required
+              size="sm"
+              value={formData.province}
+              onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Especialidad de Servicio"
+              placeholder="Ej. Colorista, Manicura, Depiladora"
+              required
+              size="sm"
+              value={formData.specialty}
+              onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
+            />
+            <Select
+              label="Rol de Trabajo"
+              size="sm"
+              options={[
+                { label: 'Estilista / Personal (Acceso restringido)', value: 'staff' },
+                { label: 'Administrador de Salón (Acceso completo)', value: 'tenant_admin' },
+              ]}
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value as StaffMember['role'] })}
+            />
+          </div>
+
+          <div className="border-t border-border-custom pt-4">
+            <h4 className="text-xs font-bold text-primary mb-3 uppercase tracking-wider">Cuenta de Acceso (Login)</h4>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-semibold text-zinc-550 mb-1 dark:text-zinc-400 uppercase tracking-wide">
+                  Usuario de Ingreso / Login
+                </label>
+                <div className="flex rounded-lg overflow-hidden border border-border-custom bg-white dark:bg-card-custom transition-all focus-within:ring-2 focus-within:ring-primary-accent focus-within:border-transparent">
+                  <input
+                    type="text"
+                    placeholder="Ej. carlos.gomez"
+                    required
+                    className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-transparent border-0 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none"
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') })}
+                  />
+                  <span className="inline-flex items-center px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-900 border-l border-border-custom text-zinc-505 text-xs font-semibold select-none">
+                    @{computeDomain()}.com
+                  </span>
+                </div>
+              </div>
+
+              <Input
+                label="Contraseña Temporal"
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                required
+                size="sm"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              />
+            </div>
+          </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border-custom">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
