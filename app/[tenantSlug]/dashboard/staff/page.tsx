@@ -68,6 +68,7 @@ export default function StaffPage() {
   const [tenantId, setTenantId] = useState<string | null>(null)
   const [tenantName, setTenantName] = useState<string>('')
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
+  const [maxStaffLimit, setMaxStaffLimit] = useState<number | null>(null)
 
   // Modal controls
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -104,16 +105,25 @@ export default function StaffPage() {
     setLoading(true)
     setErrorMsg('')
     try {
-      // 1. Get Tenant Details
+      // 1. Get Tenant Details and Plan Limit
       const { data: tenant } = await supabase
         .from('tenants')
-        .select('id, name')
+        .select(`
+          id,
+          name,
+          plan_id,
+          subscription_plans (
+            max_staff
+          )
+        `)
         .eq('slug', tenantSlug)
         .single()
 
       if (!tenant) throw new Error('Comercio no encontrado')
       setTenantId(tenant.id)
       setTenantName(tenant.name)
+      const limit = (tenant.subscription_plans as any)?.max_staff
+      setMaxStaffLimit(limit !== undefined ? limit : null)
 
       // 2. Fetch staff for this tenant
       const { data: staffData, error: staffError } = await supabase
@@ -153,6 +163,10 @@ export default function StaffPage() {
   }, [tenantSlug])
 
   const handleOpenAddModal = () => {
+    if (maxStaffLimit !== null && staff.length >= maxStaffLimit) {
+      alert(`Límite de profesionales alcanzado para tu plan (Máx. ${maxStaffLimit} profesionales incluyendo el administrador). Actualiza tu plan para registrar más personal.`)
+      return
+    }
     setEditingStaff(null)
     setFormData({
       username: '',
@@ -311,14 +325,25 @@ export default function StaffPage() {
     )
   }
 
+  const limitReached = maxStaffLimit !== null && staff.length >= maxStaffLimit
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Equipo de Trabajo (Staff)</h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">Administra los profesionales del salón, sus especialidades y sus cuentas de acceso.</p>
+          {limitReached && (
+            <p className="text-xs text-rose-600 dark:text-rose-455 font-semibold mt-1.5 animate-pulse">
+              Límite de profesionales alcanzado para tu plan (Máx. {maxStaffLimit} profesional contando el administrador). Actualiza tu plan para registrar más personal.
+            </p>
+          )}
         </div>
-        <Button onClick={handleOpenAddModal} className="shrink-0 flex items-center gap-2">
+        <Button 
+          onClick={handleOpenAddModal} 
+          disabled={limitReached}
+          className="shrink-0 flex items-center gap-2"
+        >
           <Plus className="w-4 h-4" />
           Registrar Personal
         </Button>

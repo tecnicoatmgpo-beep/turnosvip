@@ -110,6 +110,7 @@ export default function AgendaPage() {
   const [products, setProducts] = useState<any[]>([])
   const [hasProductSupport, setHasProductSupport] = useState<boolean>(false)
   const [maxAppointmentsLimit, setMaxAppointmentsLimit] = useState<number | null>(null)
+  const [currentMonthAppointmentsCount, setCurrentMonthAppointmentsCount] = useState<number>(0)
 
   // Views & Filtering
   const [viewMode, setViewMode] = useState<ViewMode>('day')
@@ -178,6 +179,26 @@ export default function AgendaPage() {
       setTenantId(tenant.id)
       const limit = (tenant.subscription_plans as any)?.max_appointments_per_month
       setMaxAppointmentsLimit(limit !== undefined ? limit : null)
+
+      // Count appointments for current month
+      let monthlyCount = 0
+      if (limit !== undefined && limit !== null) {
+        const now = new Date()
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString()
+
+        const { count, error: countErr } = await supabase
+          .from('appointments')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', tenant.id)
+          .gte('created_at', startOfMonth)
+          .lte('created_at', endOfMonth)
+
+        if (!countErr && count !== null) {
+          monthlyCount = count
+        }
+      }
+      setCurrentMonthAppointmentsCount(monthlyCount)
 
       // 2. Fetch Services
       const { data: servicesData } = await supabase
@@ -371,6 +392,10 @@ export default function AgendaPage() {
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
+    if (maxAppointmentsLimit !== null && currentMonthAppointmentsCount >= maxAppointmentsLimit) {
+      alert(`Límite de turnos mensuales alcanzado. Tu plan actual permite un máximo de ${maxAppointmentsLimit} turnos al mes. Actualiza tu plan para agendar más turnos.`)
+      return
+    }
     setEditingAppointment(null)
     setFormData({
       client_name: '',
@@ -800,6 +825,8 @@ export default function AgendaPage() {
     canceled: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/50'
   }
 
+  const limitReached = maxAppointmentsLimit !== null && currentMonthAppointmentsCount >= maxAppointmentsLimit
+
   return (
     <div className="space-y-6">
       {/* Header section */}
@@ -810,7 +837,11 @@ export default function AgendaPage() {
             Visualiza y programa las citas de tus clientes de manera fácil.
           </p>
         </div>
-        <Button onClick={handleOpenCreateModal} className="shrink-0 flex items-center gap-2">
+        <Button 
+          onClick={handleOpenCreateModal} 
+          disabled={limitReached}
+          className="shrink-0 flex items-center gap-2"
+        >
           <Plus className="w-4 h-4" />
           Nuevo Turno
         </Button>
@@ -827,6 +858,18 @@ export default function AgendaPage() {
         <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg text-rose-600 text-xs flex items-center gap-2 dark:bg-rose-950/20 dark:border-rose-950/30 dark:text-rose-400">
           <XCircle className="w-4 h-4 shrink-0" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {limitReached && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm flex items-start gap-3 dark:bg-rose-950/20 dark:border-rose-950/30 dark:text-rose-455">
+          <AlertCircle className="w-5 h-5 mt-0.5 shrink-0 text-rose-600 dark:text-rose-400" />
+          <div>
+            <h4 className="font-bold">Límite de Turnos Mensuales Alcanzado</h4>
+            <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">
+              Tu plan actual permite un máximo de {maxAppointmentsLimit} turnos al mes. Se ha deshabilitado la creación de nuevos turnos.
+            </p>
+          </div>
         </div>
       )}
 
