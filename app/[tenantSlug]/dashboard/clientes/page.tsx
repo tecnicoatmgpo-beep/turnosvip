@@ -186,6 +186,41 @@ export default function ClientesPage() {
   const [postSaleTx, setPostSaleTx] = useState<any>(null)
   const [postSaleDetails, setPostSaleDetails] = useState<any>(null)
 
+  // Inventario states
+  const [isInventoryEnabled, setIsInventoryEnabled] = useState(false)
+  const [productsCatalog, setProductsCatalog] = useState<any[]>([])
+  const [selectedProductId, setSelectedProductId] = useState('')
+
+  const fetchInventoryCatalog = async () => {
+    try {
+      const res = await fetch('/api/tenant/inventory')
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setProductsCatalog(data.products || [])
+      }
+    } catch (e) {
+      console.error('Error loading inventory catalog:', e)
+    }
+  }
+
+  const handleProductChange = (productId: string) => {
+    setSelectedProductId(productId)
+    const product = productsCatalog.find(p => p.id === productId)
+    if (product) {
+      setSaleFormData(prev => ({
+        ...prev,
+        product_name: product.name,
+        price: product.sale_price.toString()
+      }))
+    } else {
+      setSaleFormData(prev => ({
+        ...prev,
+        product_name: '',
+        price: ''
+      }))
+    }
+  }
+
   const checkCajaStatus = async () => {
     setCheckingCaja(true)
     try {
@@ -216,15 +251,25 @@ export default function ClientesPage() {
     setLoading(true)
     setErrorMsg('')
     try {
-      // 1. Get Tenant ID
+      // 1. Get Tenant ID and enabled modules
       const { data: tenant } = await supabase
         .from('tenants')
-        .select('id')
+        .select('id, enabled_modules')
         .eq('slug', tenantSlug)
         .single()
 
       if (!tenant) throw new Error('Comercio no encontrado')
       setTenantId(tenant.id)
+
+      // Check if inventory is enabled and fetch catalog if true
+      const modules = tenant.enabled_modules as any
+      if (modules && typeof modules === 'object') {
+        const isInvEnabled = !!modules.inventario
+        setIsInventoryEnabled(isInvEnabled)
+        if (isInvEnabled) {
+          fetchInventoryCatalog()
+        }
+      }
 
       // 2. Fetch Customers
       const { data: customersData, error: customersErr } = await supabase
@@ -438,12 +483,35 @@ export default function ClientesPage() {
     if (!selectedCustomer || !tenantId) return
     setSaleErrorMsg('')
 
-    const payload = {
+    const qty = parseInt(saleFormData.quantity, 10) || 1
+    const priceVal = parseFloat(saleFormData.price) || 0
+
+    if (isInventoryEnabled) {
+      if (!selectedProductId) {
+        setSaleErrorMsg('Debes seleccionar un producto del inventario.')
+        return
+      }
+      const product = productsCatalog.find(p => p.id === selectedProductId)
+      if (!product) {
+        setSaleErrorMsg('El producto seleccionado no es válido.')
+        return
+      }
+      if (product.stock < qty) {
+        setSaleErrorMsg(`Stock insuficiente en inventario. Stock disponible: ${product.stock} unidades.`)
+        return
+      }
+    }
+
+    const payload: any = {
       tenant_id: tenantId,
       customer_id: selectedCustomer.id,
       product_name: saleFormData.product_name.trim(),
-      quantity: parseInt(saleFormData.quantity, 10) || 1,
-      price: parseFloat(saleFormData.price) || 0
+      quantity: qty,
+      price: priceVal
+    }
+
+    if (isInventoryEnabled) {
+      payload.product_id = selectedProductId
     }
 
     if (!payload.product_name) {
@@ -484,6 +552,24 @@ export default function ClientesPage() {
       const txData = await txRes.json()
       if (!txRes.ok) throw new Error(txData.error)
 
+      // 3.5 Deduct Stock from Inventory
+      if (isInventoryEnabled && selectedProductId) {
+        const moveRes = await fetch('/api/tenant/inventory/movement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            product_id: selectedProductId,
+            type: 'output',
+            quantity: qty,
+            reason: `Venta POS a cliente: ${selectedCustomer.first_name} ${selectedCustomer.last_name}`
+          })
+        })
+        const moveData = await moveRes.json()
+        if (!moveRes.ok) {
+          throw new Error(moveData.error || 'Error al actualizar el stock en inventario.')
+        }
+      }
+
       // 4. Store ticket details and display
       setPostSaleTx({
         id: txData.transaction.id,
@@ -507,7 +593,11 @@ export default function ClientesPage() {
       })
 
       setIsAddingSale(false)
+      setSelectedProductId('')
       setSaleFormData({ product_name: '', quantity: '1', price: '', payment_method: 'efectivo' })
+      if (isInventoryEnabled) {
+        fetchInventoryCatalog()
+      }
       showNotification('Venta de producto registrada y cobrada con éxito', 'success')
       
       setIsFichaModalOpen(false)
@@ -1026,13 +1116,29 @@ export default function ClientesPage() {
                           <p className="text-[10px] text-rose-550 font-bold">{saleErrorMsg}</p>
                         )}
 
-                        <Input
-                          label="Nombre del Producto"
-                          placeholder="Ej. Shampoo Keratina 250ml"
-                          required
-                          value={saleFormData.product_name}
-                          onChange={(e) => setSaleFormData({ ...saleFormData, product_name: e.target.value })}
-                        />
+                         {isInventoryEnabled ? (
+                           <Select
+                             label="Seleccionar Producto"
+                             required
+                             value={selectedProductId}
+                             onChange={(e) => handleProductChange(e.target.value)}
+                             options={[
+                               { label: '-- Selecciona Producto --', value: '' },
+                               ...productsCatalog.map(p => ({
+                                 label: `${p.name} (Disponibles: ${p.stock})`,
+                                 value: p.id
+                               }))
+                             ]}
+                           />
+                         ) : (
+                           <Input
+                             label="Nombre del Producto"
+                             placeholder="Ej. Shampoo Keratina 250ml"
+                             required
+                             value={saleFormData.product_name}
+                             onChange={(e) => setSaleFormData({ ...saleFormData, product_name: e.target.value })}
+                           />
+                         )}
 
                         <div className="grid grid-cols-2 gap-3">
                           <Input
