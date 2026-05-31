@@ -77,6 +77,14 @@ interface Appointment {
     email: string
   } | null
   customer_id?: string | null
+  product_id?: string | null
+  product_qty?: number
+  products?: {
+    id: string
+    name: string
+    sale_price: number
+    stock: number
+  } | null
 }
 
 type ViewMode = 'day' | 'week' | 'list'
@@ -99,6 +107,8 @@ export default function AgendaPage() {
   const [services, setServices] = useState<Service[]>([])
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [products, setProducts] = useState<any[]>([])
+  const [hasProductSupport, setHasProductSupport] = useState<boolean>(false)
 
   // Views & Filtering
   const [viewMode, setViewMode] = useState<ViewMode>('day')
@@ -138,7 +148,9 @@ export default function AgendaPage() {
     notes: '',
     status: 'confirmed' as Appointment['status'],
     customer_id: '',
-    payment_method: 'efectivo' as 'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito' | 'mercadopago'
+    payment_method: 'efectivo' as 'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito' | 'mercadopago',
+    product_id: '',
+    product_qty: '1'
   })
 
   const supabase = createClient()
@@ -177,19 +189,62 @@ export default function AgendaPage() {
 
       setStaff(staffData || [])
 
-      // 4. Fetch Appointments
-      const { data: apptsData, error: apptsErr } = await supabase
-        .from('appointments')
-        .select('*, services(name, duration_minutes), users(email)')
-        .eq('tenant_id', tenant.id)
-        .order('appointment_time', { ascending: true })
+      // 4. Fetch Active Products Catalog
+      let fetchedProducts: any[] = []
+      try {
+        const { data: productsData, error: prodErr } = await supabase
+          .from('products')
+          .select('id, name, sale_price, stock')
+          .eq('tenant_id', tenant.id)
+          .eq('is_active', true)
+          .order('name')
+        if (!prodErr && productsData) {
+          fetchedProducts = productsData
+        }
+      } catch (err) {
+        console.warn('Failed to load products:', err)
+      }
+      setProducts(fetchedProducts)
 
-      if (apptsErr) throw apptsErr
+      // 5. Fetch Appointments with product details if supported
+      let appointmentsRaw: any[] = []
+      let supportsProduct = false
+
+      try {
+        const { data: apptsWithProd, error: prodRelErr } = await supabase
+          .from('appointments')
+          .select('*, services(name, duration_minutes), users(email), products(id, name, sale_price, stock)')
+          .eq('tenant_id', tenant.id)
+          .order('appointment_time', { ascending: true })
+
+        if (prodRelErr) {
+          if (prodRelErr.message.includes('product_id') || prodRelErr.message.includes('does not exist')) {
+            const { data: apptsNoProd, error: noProdErr } = await supabase
+              .from('appointments')
+              .select('*, services(name, duration_minutes), users(email)')
+              .eq('tenant_id', tenant.id)
+              .order('appointment_time', { ascending: true })
+            
+            if (noProdErr) throw noProdErr
+            appointmentsRaw = apptsNoProd || []
+          } else {
+            throw prodRelErr
+          }
+        } else {
+          appointmentsRaw = apptsWithProd || []
+          supportsProduct = true
+        }
+      } catch (err: any) {
+        console.error('Error fetching appointments:', err.message)
+        throw err
+      }
+      setHasProductSupport(supportsProduct)
       
-      const formattedAppts = (apptsData || []).map((item: any) => ({
+      const formattedAppts = (appointmentsRaw || []).map((item: any) => ({
         ...item,
         services: Array.isArray(item.services) ? item.services[0] : item.services,
-        users: Array.isArray(item.users) ? item.users[0] : item.users
+        users: Array.isArray(item.users) ? item.users[0] : item.users,
+        products: Array.isArray(item.products) ? item.products[0] : item.products
       })) as Appointment[]
       
       setAppointments(formattedAppts)
@@ -319,7 +374,9 @@ export default function AgendaPage() {
       notes: '',
       status: 'confirmed',
       customer_id: '',
-      payment_method: 'efectivo'
+      payment_method: 'efectivo',
+      product_id: '',
+      product_qty: '1'
     })
     setIsModalOpen(true)
   }
@@ -352,7 +409,9 @@ export default function AgendaPage() {
       notes: appt.notes || '',
       status: appt.status,
       customer_id: appt.customer_id || '',
-      payment_method: paymentMethod
+      payment_method: paymentMethod,
+      product_id: appt.product_id || '',
+      product_qty: (appt.product_qty || 1).toString()
     })
     setIsDetailModalOpen(false)
     setIsModalOpen(true)
@@ -429,7 +488,7 @@ export default function AgendaPage() {
     e.preventDefault()
     if (!tenantId) return
 
-    const payload = {
+    const payload: any = {
       tenant_id: tenantId,
       client_name: formData.client_name.trim(),
       client_phone: formData.client_phone.trim() || null,
@@ -443,7 +502,14 @@ export default function AgendaPage() {
       customer_id: formData.customer_id || null
     }
 
+    if (hasProductSupport) {
+      payload.product_id = formData.product_id || null
+      payload.product_qty = formData.product_id ? parseInt(formData.product_qty, 10) : null
+    }
+
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+
       // 1. Verify Cash Register is open if setting status to Completed
       let activeRegister: any = null
       if (payload.status === 'completed') {
@@ -455,9 +521,29 @@ export default function AgendaPage() {
         activeRegister = statusData.register
       }
 
+      // 2. Validate product stock if a product is linked and we are completing the turn
+      const isNewCompletion = payload.status === 'completed' && (!editingAppointment || editingAppointment.status !== 'completed')
+      let linkedProduct: any = null
+      let prodQty = 1
+      if (isNewCompletion && hasProductSupport && formData.product_id) {
+        prodQty = parseInt(formData.product_qty, 10)
+        const { data: prod } = await supabase
+          .from('products')
+          .select('id, name, sale_price, stock')
+          .eq('id', formData.product_id)
+          .single()
+        
+        if (prod) {
+          if (prod.stock < prodQty) {
+            throw new Error(`Stock insuficiente para "${prod.name}". Disponible: ${prod.stock}, Solicitado: ${prodQty}`)
+          }
+          linkedProduct = prod
+        }
+      }
+
       let apptId = editingAppointment?.id || ''
 
-      // 2. Revert completed transaction if changing status away from completed
+      // 3. Revert completed transaction if changing status away from completed
       if (editingAppointment && editingAppointment.status === 'completed' && payload.status !== 'completed') {
         await supabase
           .from('cash_transactions')
@@ -465,7 +551,7 @@ export default function AgendaPage() {
           .eq('reference_id', editingAppointment.id)
       }
 
-      // 3. Save Appointment
+      // 4. Save Appointment
       if (editingAppointment) {
         const { error } = await supabase
           .from('appointments')
@@ -486,44 +572,99 @@ export default function AgendaPage() {
         showNotification('Turno creado con éxito', 'success')
       }
 
-      // 4. Handle Cash Transaction insertion/update if completed
+      // 5. Handle stock updates, movement, and sales if new completion
+      if (isNewCompletion && linkedProduct) {
+        const newStock = linkedProduct.stock - prodQty
+        
+        // Update stock
+        const { error: stockErr } = await supabase
+          .from('products')
+          .update({ stock: newStock, updated_at: new Date().toISOString() })
+          .eq('id', linkedProduct.id)
+        if (stockErr) throw stockErr
+
+        // Log movement
+        const { error: moveErr } = await supabase
+          .from('stock_movements')
+          .insert({
+            tenant_id: tenantId,
+            product_id: linkedProduct.id,
+            user_id: user?.id || '',
+            type: 'output',
+            quantity: prodQty,
+            previous_stock: linkedProduct.stock,
+            new_stock: newStock,
+            reason: `Venta vinculada a turno (Cliente: ${payload.client_name})`
+          })
+        if (moveErr) console.error('Error logging movement:', moveErr.message)
+
+        // Insert sale
+        const { error: saleErr } = await supabase
+          .from('sales')
+          .insert({
+            tenant_id: tenantId,
+            customer_id: payload.customer_id || null,
+            product_name: linkedProduct.name,
+            quantity: prodQty,
+            price: linkedProduct.sale_price,
+            product_id: linkedProduct.id
+          })
+        if (saleErr) console.error('Error logging sale:', saleErr.message)
+      }
+
+      // 6. Handle Cash Transactions if completed
       if (payload.status === 'completed' && activeRegister) {
-        // Check if there is an existing transaction
-        const { data: existingTx } = await supabase
+        // Delete old transactions to prevent duplicates
+        await supabase
           .from('cash_transactions')
-          .select('id')
+          .delete()
           .eq('reference_id', apptId)
-          .maybeSingle()
 
-        const { data: { user } } = await supabase.auth.getUser()
+        // A. Insert Service Transaction
+        const { error: txErr } = await supabase
+          .from('cash_transactions')
+          .insert({
+            tenant_id: tenantId,
+            register_id: activeRegister.id,
+            user_id: user?.id || '',
+            type: 'income',
+            amount: payload.total_price,
+            payment_method: formData.payment_method,
+            category: 'servicio',
+            reference_id: apptId,
+            notes: `Cobro de turno - Cliente: ${payload.client_name}`
+          })
+        if (txErr) throw txErr
 
-        if (existingTx) {
-          // Update transaction
-          const { error: txErr } = await supabase
-            .from('cash_transactions')
-            .update({
-              amount: payload.total_price,
-              payment_method: formData.payment_method,
-              notes: `Cobro de turno - Cliente: ${payload.client_name}`
-            })
-            .eq('id', existingTx.id)
-          if (txErr) throw txErr
-        } else {
-          // Insert transaction
-          const { error: txErr } = await supabase
+        // B. Insert Product Transaction (if any)
+        let currentLinkedProduct = linkedProduct
+        let currentProdQty = prodQty
+        if (!currentLinkedProduct && hasProductSupport && formData.product_id) {
+          const { data: prod } = await supabase
+            .from('products')
+            .select('id, name, sale_price')
+            .eq('id', formData.product_id)
+            .single()
+          currentLinkedProduct = prod
+          currentProdQty = parseInt(formData.product_qty, 10)
+        }
+
+        if (currentLinkedProduct) {
+          const productTotal = currentLinkedProduct.sale_price * currentProdQty
+          const { error: pTxErr } = await supabase
             .from('cash_transactions')
             .insert({
               tenant_id: tenantId,
               register_id: activeRegister.id,
               user_id: user?.id || '',
               type: 'income',
-              amount: payload.total_price,
+              amount: productTotal,
               payment_method: formData.payment_method,
-              category: 'servicio',
+              category: 'producto',
               reference_id: apptId,
-              notes: `Cobro de turno - Cliente: ${payload.client_name}`
+              notes: `Producto vinculado a turno (${currentLinkedProduct.name} x${currentProdQty}) - Cliente: ${payload.client_name}`
             })
-          if (txErr) throw txErr
+          if (pTxErr) throw pTxErr
         }
       }
 
@@ -1301,6 +1442,46 @@ export default function AgendaPage() {
             </div>
           </div>
 
+          {hasProductSupport && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-500 mb-1 dark:text-zinc-400 uppercase tracking-wide">
+                  Producto Adicional (Opcional)
+                </label>
+                <select
+                  value={formData.product_id}
+                  onChange={(e) => {
+                    const prodId = e.target.value
+                    setFormData(prev => ({
+                      ...prev,
+                      product_id: prodId,
+                      product_qty: prodId ? prev.product_qty : '1'
+                    }))
+                  }}
+                  className="w-full px-3 py-2 text-sm bg-white border border-border-custom rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-primary-accent focus:border-transparent dark:bg-card-custom dark:border-border-custom dark:text-zinc-100 transition-all cursor-pointer"
+                >
+                  <option value="">-- Ningún producto --</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id} disabled={p.stock <= 0}>
+                      {p.name} (${Number(p.sale_price).toLocaleString('es-AR')}) - Stock: {p.stock} {p.stock <= 0 ? '(Agotado)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Input
+                  label="Cantidad Producto"
+                  type="number"
+                  min="1"
+                  disabled={!formData.product_id}
+                  value={formData.product_qty}
+                  onChange={(e) => setFormData({ ...formData, product_qty: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Fecha y Hora"
@@ -1400,11 +1581,30 @@ export default function AgendaPage() {
                   {checkoutAppointment.services?.name || 'Servicio Contratado'}
                 </span>
               </div>
+              {checkoutAppointment.products && (
+                <div className="flex justify-between text-xs border-t border-border-custom pt-2">
+                  <span className="text-zinc-500">Producto Adicional:</span>
+                  <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                    {checkoutAppointment.products.name} (x{checkoutAppointment.product_qty})
+                  </span>
+                </div>
+              )}
+              {checkoutAppointment.products && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-zinc-500">Precio Producto:</span>
+                  <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                    {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(checkoutAppointment.products.sale_price * (checkoutAppointment.product_qty || 1))}
+                  </span>
+                </div>
+              )}
               <div className="border-t border-border-custom my-2"></div>
               <div className="flex justify-between text-sm font-bold">
                 <span>Total a Cobrar:</span>
                 <span className="text-primary">
-                  {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(checkoutAppointment.total_price)}
+                  {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(
+                    checkoutAppointment.total_price + 
+                    (checkoutAppointment.products ? (checkoutAppointment.products.sale_price * (checkoutAppointment.product_qty || 1)) : 0)
+                  )}
                 </span>
               </div>
             </div>
@@ -1461,7 +1661,33 @@ export default function AgendaPage() {
                     throw new Error('La caja se encuentra cerrada.')
                   }
 
-                  // 2. Register Cash Transaction
+                  // 2. Handle linked product stock validation and updates
+                  let linkedProduct: any = null
+                  let prodQty = checkoutAppointment.product_qty || 1
+                  if (hasProductSupport && checkoutAppointment.product_id) {
+                    const { data: prod, error: prodErr } = await supabase
+                      .from('products')
+                      .select('id, name, sale_price, stock')
+                      .eq('id', checkoutAppointment.product_id)
+                      .single()
+
+                    if (prodErr || !prod) {
+                      throw new Error('El producto vinculado al turno no existe en el catálogo.')
+                    }
+
+                    if (prod.stock < prodQty) {
+                      throw new Error(`Stock insuficiente para "${prod.name}". Disponible: ${prod.stock}, Solicitado: ${prodQty}`)
+                    }
+                    linkedProduct = prod
+                  }
+
+                  // Delete old cash transactions if any
+                  await supabase
+                    .from('cash_transactions')
+                    .delete()
+                    .eq('reference_id', checkoutAppointment.id)
+
+                  // 3. Register Cash Transaction for Service
                   const txRes = await fetch('/api/tenant/caja/transaction', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1477,7 +1703,65 @@ export default function AgendaPage() {
                   const txData = await txRes.json()
                   if (!txRes.ok) throw new Error(txData.error)
 
-                  // 3. Update appointment status in DB
+                  let productAmount = 0
+                  // 4. Update product stock and insert sale if product is linked
+                  if (linkedProduct) {
+                    productAmount = Number(linkedProduct.sale_price) * prodQty
+                    const newStock = linkedProduct.stock - prodQty
+
+                    // A. Update Stock
+                    const { error: stockErr } = await supabase
+                      .from('products')
+                      .update({ stock: newStock, updated_at: new Date().toISOString() })
+                      .eq('id', linkedProduct.id)
+                    if (stockErr) throw stockErr
+
+                    // B. Log movement
+                    const { error: moveErr } = await supabase
+                      .from('stock_movements')
+                      .insert({
+                        tenant_id: tenantId,
+                        product_id: linkedProduct.id,
+                        user_id: user?.id || '',
+                        type: 'output',
+                        quantity: prodQty,
+                        previous_stock: linkedProduct.stock,
+                        new_stock: newStock,
+                        reason: `Venta vinculada a turno (Cliente: ${checkoutAppointment.client_name})`
+                      })
+                    if (moveErr) console.error('Error logging movement:', moveErr.message)
+
+                    // C. Insert Sale
+                    const { error: saleErr } = await supabase
+                      .from('sales')
+                      .insert({
+                        tenant_id: tenantId,
+                        customer_id: checkoutAppointment.customer_id || null,
+                        product_name: linkedProduct.name,
+                        quantity: prodQty,
+                        price: linkedProduct.sale_price,
+                        product_id: linkedProduct.id
+                      })
+                    if (saleErr) console.error('Error logging sale:', saleErr.message)
+
+                    // D. Insert Product Transaction in Caja
+                    const pTxRes = await fetch('/api/tenant/caja/transaction', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        type: 'income',
+                        amount: productAmount,
+                        payment_method: checkoutPaymentMethod,
+                        category: 'producto',
+                        reference_id: checkoutAppointment.id,
+                        notes: `Producto vinculado a turno (${linkedProduct.name} x${prodQty}) - Cliente: ${checkoutAppointment.client_name}`
+                      })
+                    })
+                    const pTxData = await pTxRes.json()
+                    if (!pTxRes.ok) throw new Error(pTxData.error)
+                  }
+
+                  // 5. Update appointment status in DB
                   const { error: apptErr } = await supabase
                     .from('appointments')
                     .update({ status: 'completed', updated_at: new Date().toISOString() })
@@ -1486,12 +1770,13 @@ export default function AgendaPage() {
                   if (apptErr) throw apptErr
 
                   // Load ticket print preview data
+                  const combinedTotal = checkoutAppointment.total_price + productAmount
                   setPostCheckoutTx({
                     id: txData.transaction.id,
                     created_at: txData.transaction.created_at,
-                    amount: txData.transaction.amount,
-                    payment_method: txData.transaction.payment_method,
-                    category: txData.transaction.category,
+                    amount: combinedTotal,
+                    payment_method: checkoutPaymentMethod,
+                    category: 'servicio',
                     user: { first_name: currentUserName }
                   })
 
@@ -1514,6 +1799,8 @@ export default function AgendaPage() {
                     tenantData = fullTenant
                   }
 
+                  const descCombined = checkoutAppointment.services?.name + (linkedProduct ? ` + ${linkedProduct.name} (x${prodQty})` : '')
+
                   setPostCheckoutDetails({
                     tenantName: tenantData?.name || 'Mi Turno VIP',
                     tenantAddress: tenantData?.address || '',
@@ -1522,7 +1809,7 @@ export default function AgendaPage() {
                     tenantEmail: tenantData?.email || '',
                     tenantActivityStart: tenantData?.activity_start_date || '',
                     clientName: checkoutAppointment.client_name,
-                    serviceOrProduct: checkoutAppointment.services?.name || 'Servicio de Estética'
+                    serviceOrProduct: descCombined
                   })
 
                   setIsCheckoutModalOpen(false)

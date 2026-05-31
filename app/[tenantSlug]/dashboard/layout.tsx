@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { Calendar, Store, Users, LogOut, Menu, X, Scissors, User, UserCheck, Wallet, Package, Settings } from 'lucide-react'
+import { Calendar, Store, Users, LogOut, Menu, X, Scissors, User, UserCheck, Wallet, Package, Settings, ShoppingCart } from 'lucide-react'
 
 export default function TenantDashboardLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
@@ -24,7 +24,8 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
     marketing: false,
     whatsapp: false,
     caja: false,
-    inventario: false
+    inventario: false,
+    ventas_mostrador: true
   })
 
 
@@ -99,6 +100,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const menuItems = [
     { name: 'Resumen', href: `/${tenantSlug}/dashboard`, icon: Store, moduleKey: 'statistics' },
     { name: 'Agenda / Turnos', href: `/${tenantSlug}/dashboard/agenda`, icon: Calendar, moduleKey: 'agenda' },
+    { name: 'Venta Mostrador', href: `/${tenantSlug}/dashboard/ventas`, icon: ShoppingCart, moduleKey: 'ventas_mostrador' },
     { name: 'Caja Diaria', href: `/${tenantSlug}/dashboard/caja`, icon: Wallet, moduleKey: 'caja' },
     { name: 'Inventario', href: `/${tenantSlug}/dashboard/inventario`, icon: Package, moduleKey: 'inventario' },
     { name: 'Clientes', href: `/${tenantSlug}/dashboard/clientes`, icon: UserCheck, moduleKey: 'clientes' },
@@ -113,7 +115,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
 
     // 2. Hide admin sections if user is staff
     if (rawRole === 'staff') {
-      return item.moduleKey === 'agenda' || item.moduleKey === 'clientes' || item.moduleKey === 'caja' || item.moduleKey === 'inventario'
+      return item.moduleKey === 'agenda' || item.moduleKey === 'clientes' || item.moduleKey === 'caja' || item.moduleKey === 'inventario' || item.moduleKey === 'ventas_mostrador'
     }
 
     return true
@@ -130,6 +132,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
       
       let currentKey = 'statistics'
       if (subpath === 'agenda') currentKey = 'agenda'
+      else if (subpath === 'ventas') currentKey = 'ventas_mostrador'
       else if (subpath === 'clientes') currentKey = 'clientes'
       else if (subpath === 'servicios') currentKey = 'servicios'
       else if (subpath === 'staff') currentKey = 'staff'
