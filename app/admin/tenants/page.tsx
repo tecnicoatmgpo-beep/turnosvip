@@ -64,6 +64,18 @@ const PLAN_DEFAULTS: Record<string, EnabledModules> = {
     inventario: false,
     ventas_mostrador: false,
   },
+  basico: {
+    agenda: true,
+    servicios: true,
+    staff: true,
+    statistics: false,
+    marketing: false,
+    whatsapp: false,
+    clientes: true,
+    caja: false,
+    inventario: false,
+    ventas_mostrador: false,
+  },
   pro: {
     agenda: true,
     servicios: true,
@@ -87,12 +99,26 @@ const PLAN_DEFAULTS: Record<string, EnabledModules> = {
     caja: true,
     inventario: true,
     ventas_mostrador: true,
+  },
+  premium: {
+    agenda: true,
+    servicios: true,
+    staff: true,
+    statistics: true,
+    marketing: true,
+    whatsapp: true,
+    clientes: true,
+    caja: true,
+    inventario: true,
+    ventas_mostrador: true,
   }
 }
 
 interface Plan {
   id: string
   name: string
+  slug: string
+  max_staff: number | null
 }
 
 const getRemainingDays = (tenant: Tenant) => {
@@ -289,7 +315,7 @@ export default function TenantsPage() {
 
       const { data: plansData, error: plansError } = await supabase
         .from('subscription_plans')
-        .select('id, name')
+        .select('id, name, slug, max_staff')
         .order('name')
 
       if (plansError) throw plansError
@@ -378,6 +404,28 @@ export default function TenantsPage() {
 
     try {
       if (editingTenant) {
+        // Limit check if plan is changing
+        if (payload.plan_id !== editingTenant.plan_id) {
+          const selectedPlan = plans.find(p => p.id === payload.plan_id)
+          if (selectedPlan && selectedPlan.max_staff !== null) {
+            const { count, error: countErr } = await supabase
+              .from('users')
+              .select('*', { count: 'exact', head: true })
+              .eq('tenant_id', editingTenant.id)
+              .in('role', ['tenant_admin', 'staff'])
+
+            if (countErr) {
+              setErrorMsg('Error al verificar la cantidad de profesionales en este comercio.')
+              return
+            }
+
+            if ((count || 0) > selectedPlan.max_staff) {
+              setErrorMsg(`No se puede degradar el plan. El comercio tiene ${count} profesional(es) activo(s), pero el plan seleccionado admite un máximo de ${selectedPlan.max_staff} (incluyendo el administrador).`)
+              return
+            }
+          }
+        }
+
         // Update existing tenant (directly client-side)
         const { error } = await supabase
           .from('tenants')

@@ -55,6 +55,57 @@ export async function POST(request: Request) {
     // 4. Initialize admin auth client
     const adminSupabase = createAdminClient()
 
+    // 4.1. Get existing user's role and tenant_id
+    const { data: existingUser, error: existErr } = await adminSupabase
+      .from('users')
+      .select('role, tenant_id')
+      .eq('id', id)
+      .single()
+
+    if (existErr || !existingUser) {
+      return NextResponse.json({ error: 'Usuario a actualizar no encontrado.' }, { status: 404 })
+    }
+
+    const wasProfessional = (existingUser.role === 'tenant_admin' || existingUser.role === 'staff') && existingUser.tenant_id === tenant_id
+    const willBeProfessional = (role === 'tenant_admin' || role === 'staff')
+
+    if (willBeProfessional && !wasProfessional) {
+      const { data: tenantPlan, error: tenantPlanErr } = await adminSupabase
+        .from('tenants')
+        .select(`
+          plan_id,
+          subscription_plans (
+            max_staff
+          )
+        `)
+        .eq('id', tenant_id)
+        .single()
+
+      if (tenantPlanErr || !tenantPlan) {
+        return NextResponse.json({ error: 'No se pudo verificar el plan de suscripción del comercio.' }, { status: 400 })
+      }
+
+      const maxStaff = (tenantPlan.subscription_plans as any)?.max_staff
+
+      if (maxStaff !== undefined && maxStaff !== null) {
+        const { count, error: countErr } = await adminSupabase
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', tenant_id)
+          .in('role', ['tenant_admin', 'staff'])
+
+        if (countErr) {
+          return NextResponse.json({ error: 'Error al verificar el límite de profesionales.' }, { status: 500 })
+        }
+
+        if ((count || 0) >= maxStaff) {
+          return NextResponse.json({ 
+            error: `Límite de profesionales alcanzado. El plan de este comercio permite un máximo de ${maxStaff} profesional(es) (incluyendo el administrador).` 
+          }, { status: 400 })
+        }
+      }
+    }
+
     // 5. Update user in Supabase Auth
     const authUpdatePayload: any = {
       email,

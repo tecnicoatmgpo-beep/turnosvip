@@ -59,6 +59,57 @@ export async function POST(request: Request) {
     // 3. Initialize admin client (bypasses RLS to update auth data)
     const adminSupabase = createAdminClient()
 
+    // 3.1. Fetch existing user profile to see if their role/tenant changes
+    const { data: existingUser, error: existErr } = await adminSupabase
+      .from('users')
+      .select('role, tenant_id')
+      .eq('id', id)
+      .single()
+
+    if (existErr || !existingUser) {
+      return NextResponse.json({ error: 'Usuario a actualizar no encontrado.' }, { status: 404 })
+    }
+
+    const wasProfessional = (existingUser.role === 'tenant_admin' || existingUser.role === 'staff') && existingUser.tenant_id === targetTenantId
+    const willBeProfessional = (targetRole === 'tenant_admin' || targetRole === 'staff') && targetTenantId !== null
+
+    if (willBeProfessional && !wasProfessional) {
+      const { data: tenantPlan, error: tenantPlanErr } = await adminSupabase
+        .from('tenants')
+        .select(`
+          plan_id,
+          subscription_plans (
+            max_staff
+          )
+        `)
+        .eq('id', targetTenantId)
+        .single()
+
+      if (tenantPlanErr || !tenantPlan) {
+        return NextResponse.json({ error: 'No se pudo verificar el plan de suscripción del comercio.' }, { status: 400 })
+      }
+
+      const maxStaff = (tenantPlan.subscription_plans as any)?.max_staff
+
+      if (maxStaff !== undefined && maxStaff !== null) {
+        const { count, error: countErr } = await adminSupabase
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', targetTenantId)
+          .in('role', ['tenant_admin', 'staff'])
+
+        if (countErr) {
+          return NextResponse.json({ error: 'Error al verificar el límite de profesionales del comercio.' }, { status: 500 })
+        }
+
+        if ((count || 0) >= maxStaff) {
+          return NextResponse.json({ 
+            error: `Límite de profesionales alcanzado. El plan de este comercio permite un máximo de ${maxStaff} profesional(es) (incluyendo el administrador).` 
+          }, { status: 400 })
+        }
+      }
+    }
+
     // 4. Update user in Supabase Auth via Admin Auth API
     const authUpdateData: any = {
       email: email.trim(),

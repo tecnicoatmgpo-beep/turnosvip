@@ -255,6 +255,28 @@ export default function SubscriptionsPage() {
 
     if (!editingTenant) return
 
+    // Limit check if plan is changing
+    if (assignFormData.plan_id !== editingTenant.plan_id) {
+      const selectedPlan = plans.find(p => p.id === assignFormData.plan_id)
+      if (selectedPlan && selectedPlan.max_staff !== null) {
+        const { count, error: countErr } = await supabase
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', editingTenant.id)
+          .in('role', ['tenant_admin', 'staff'])
+
+        if (countErr) {
+          setErrorMsg('Error al verificar la cantidad de profesionales en este comercio.')
+          return
+        }
+
+        if ((count || 0) > selectedPlan.max_staff) {
+          setErrorMsg(`No se puede degradar el plan. El comercio tiene ${count} profesional(es) activo(s), pero el plan seleccionado admite un máximo de ${selectedPlan.max_staff} (incluyendo el administrador).`)
+          return
+        }
+      }
+    }
+
     const payload = {
       plan_id: assignFormData.plan_id || null,
       subscription_status: assignFormData.subscription_status,
@@ -264,9 +286,9 @@ export default function SubscriptionsPage() {
 
     try {
       const { error } = await supabase
-        .from('tenants')
-        .update(payload)
-        .eq('id', editingTenant.id)
+          .from('tenants')
+          .update(payload)
+          .eq('id', editingTenant.id)
 
       if (error) throw error
 
