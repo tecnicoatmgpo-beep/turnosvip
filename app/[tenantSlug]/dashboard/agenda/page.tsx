@@ -1591,15 +1591,15 @@ export default function AgendaPage() {
                 printDiv.style.width = '80mm'
                 printDiv.innerHTML = `
                   <div style="text-align: center; margin-bottom: 15px;">
-                    <h3 style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold;">\${postCheckoutDetails?.tenantName.toUpperCase()}</h3>
+                    <h3 style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold;">${postCheckoutDetails?.tenantName?.toUpperCase() || ''}</h3>
                     <p style="margin: 0; font-size: 10px;">Mi Turno VIP POS System</p>
-                    <p style="margin: 0; font-size: 10px;">Fecha: \${new Date(postCheckoutTx.created_at).toLocaleString()}</p>
+                    <p style="margin: 0; font-size: 10px;">Fecha: ${postCheckoutTx ? new Date(postCheckoutTx.created_at).toLocaleString() : ''}</p>
                   </div>
                   <div style="border-bottom: 1px dashed #000; margin-bottom: 10px;"></div>
                   <div style="font-size: 11px; margin-bottom: 10px;">
-                    <p style="margin: 3px 0"><strong>Ticket ID:</strong> #\${postCheckoutTx.id.slice(0, 8).toUpperCase()}</p>
-                    <p style="margin: 3px 0"><strong>Atendido por:</strong> \${postCheckoutTx.user?.first_name || 'Personal'}</p>
-                    <p style="margin: 3px 0"><strong>Cliente:</strong> \${postCheckoutDetails.clientName}</p>
+                    <p style="margin: 3px 0"><strong>Ticket ID:</strong> #${postCheckoutTx ? postCheckoutTx.id.slice(0, 8).toUpperCase() : ''}</p>
+                    <p style="margin: 3px 0"><strong>Atendido por:</strong> ${postCheckoutTx?.user?.first_name || 'Personal'}</p>
+                    <p style="margin: 3px 0"><strong>Cliente:</strong> ${postCheckoutDetails?.clientName || ''}</p>
                   </div>
                   <div style="border-bottom: 1px dashed #000; margin-bottom: 10px;"></div>
                   <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
@@ -1611,17 +1611,17 @@ export default function AgendaPage() {
                     </thead>
                     <tbody>
                       <tr>
-                        <td style="padding-top: 5px;">\${postCheckoutDetails.serviceOrProduct}</td>
+                        <td style="padding-top: 5px;">${postCheckoutDetails?.serviceOrProduct || ''}</td>
                         <td style="text-align: right; padding-top: 5px; font-weight: bold;">
-                          \${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postCheckoutTx.amount)}
+                          ${postCheckoutTx ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postCheckoutTx.amount) : ''}
                         </td>
                       </tr>
                     </tbody>
                   </table>
                   <div style="border-bottom: 1px dashed #000; margin: 15px 0 10px 0;"></div>
                   <div style="font-size: 11px; text-align: right;">
-                    <p style="margin: 3px 0"><strong>Método:</strong> \${postCheckoutTx.payment_method === 'efectivo' ? 'Efectivo' : postCheckoutTx.payment_method === 'transferencia' ? 'Transferencia' : postCheckoutTx.payment_method === 'tarjeta_debito' ? 'Tarjeta Débito' : postCheckoutTx.payment_method === 'tarjeta_credito' ? 'Tarjeta Crédito' : 'MercadoPago'}</p>
-                    <p style="margin: 3px 0; font-size: 14px;"><strong>TOTAL:</strong> \${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postCheckoutTx.amount)}</p>
+                    <p style="margin: 3px 0"><strong>Método:</strong> ${postCheckoutTx ? (postCheckoutTx.payment_method === 'efectivo' ? 'Efectivo' : postCheckoutTx.payment_method === 'transferencia' ? 'Transferencia' : postCheckoutTx.payment_method === 'tarjeta_debito' ? 'Tarjeta Débito' : postCheckoutTx.payment_method === 'tarjeta_credito' ? 'Tarjeta Crédito' : 'MercadoPago') : ''}</p>
+                    <p style="margin: 3px 0; font-size: 14px;"><strong>TOTAL:</strong> ${postCheckoutTx ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postCheckoutTx.amount) : ''}</p>
                   </div>
                   <div style="border-bottom: 1px dashed #000; margin: 15px 0;"></div>
                   <div style="text-align: center; font-size: 10px;">

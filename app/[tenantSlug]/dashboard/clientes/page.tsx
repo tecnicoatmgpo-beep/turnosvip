@@ -1300,15 +1300,15 @@ export default function ClientesPage() {
                 printDiv.style.width = '80mm'
                 printDiv.innerHTML = `
                   <div style="text-align: center; margin-bottom: 15px;">
-                    <h3 style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold;">\${postSaleDetails?.tenantName.toUpperCase()}</h3>
+                    <h3 style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold;">${postSaleDetails?.tenantName?.toUpperCase() || ''}</h3>
                     <p style="margin: 0; font-size: 10px;">Mi Turno VIP POS System</p>
-                    <p style="margin: 0; font-size: 10px;">Fecha: \${new Date(postSaleTx.created_at).toLocaleString()}</p>
+                    <p style="margin: 0; font-size: 10px;">Fecha: ${postSaleTx ? new Date(postSaleTx.created_at).toLocaleString() : ''}</p>
                   </div>
                   <div style="border-bottom: 1px dashed #000; margin-bottom: 10px;"></div>
                   <div style="font-size: 11px; margin-bottom: 10px;">
-                    <p style="margin: 3px 0"><strong>Ticket ID:</strong> #\${postSaleTx.id.slice(0, 8).toUpperCase()}</p>
-                    <p style="margin: 3px 0"><strong>Operador:</strong> \${postSaleTx.user?.first_name || 'Personal'}</p>
-                    <p style="margin: 3px 0"><strong>Cliente:</strong> \${postSaleDetails.clientName}</p>
+                    <p style="margin: 3px 0"><strong>Ticket ID:</strong> #${postSaleTx ? postSaleTx.id.slice(0, 8).toUpperCase() : ''}</p>
+                    <p style="margin: 3px 0"><strong>Operador:</strong> ${postSaleTx?.user?.first_name || 'Personal'}</p>
+                    <p style="margin: 3px 0"><strong>Cliente:</strong> ${postSaleDetails?.clientName || ''}</p>
                   </div>
                   <div style="border-bottom: 1px dashed #000; margin-bottom: 10px;"></div>
                   <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
@@ -1320,17 +1320,17 @@ export default function ClientesPage() {
                     </thead>
                     <tbody>
                       <tr>
-                        <td style="padding-top: 5px;">\${postSaleDetails.serviceOrProduct}</td>
+                        <td style="padding-top: 5px;">${postSaleDetails?.serviceOrProduct || ''}</td>
                         <td style="text-align: right; padding-top: 5px; font-weight: bold;">
-                          \${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postSaleTx.amount)}
+                          ${postSaleTx ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postSaleTx.amount) : ''}
                         </td>
                       </tr>
                     </tbody>
                   </table>
                   <div style="border-bottom: 1px dashed #000; margin: 15px 0 10px 0;"></div>
                   <div style="font-size: 11px; text-align: right;">
-                    <p style="margin: 3px 0"><strong>Método:</strong> \${postSaleTx.payment_method === 'efectivo' ? 'Efectivo' : postSaleTx.payment_method === 'transferencia' ? 'Transferencia' : postSaleTx.payment_method === 'tarjeta_debito' ? 'Tarjeta Débito' : postSaleTx.payment_method === 'tarjeta_credito' ? 'Tarjeta Crédito' : 'MercadoPago'}</p>
-                    <p style="margin: 3px 0; font-size: 14px;"><strong>TOTAL:</strong> \${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postSaleTx.amount)}</p>
+                    <p style="margin: 3px 0"><strong>Método:</strong> ${postSaleTx ? (postSaleTx.payment_method === 'efectivo' ? 'Efectivo' : postSaleTx.payment_method === 'transferencia' ? 'Transferencia' : postSaleTx.payment_method === 'tarjeta_debito' ? 'Tarjeta Débito' : postSaleTx.payment_method === 'tarjeta_credito' ? 'Tarjeta Crédito' : 'MercadoPago') : ''}</p>
+                    <p style="margin: 3px 0; font-size: 14px;"><strong>TOTAL:</strong> ${postSaleTx ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postSaleTx.amount) : ''}</p>
                   </div>
                   <div style="border-bottom: 1px dashed #000; margin: 15px 0;"></div>
                   <div style="text-align: center; font-size: 10px;">
