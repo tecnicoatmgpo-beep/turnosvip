@@ -136,6 +136,20 @@ export default function SubscriptionsPage() {
     duration: '30', // New: duration in days ('30', '60', '90', '180', '365', 'custom')
   })
 
+  // Modules configuration within subscription assignment
+  const [modalModules, setModalModules] = useState<Record<string, boolean>>({
+    agenda: true,
+    servicios: true,
+    staff: true,
+    statistics: false,
+    marketing: false,
+    whatsapp: false,
+    clientes: true,
+    caja: false,
+    inventario: false,
+    ventas_mostrador: false,
+  })
+
   const supabase = createClient()
 
   const fetchData = async () => {
@@ -271,6 +285,26 @@ export default function SubscriptionsPage() {
       current_period_end: initialEnd,
       duration: '30',
     })
+
+    const existing = tenant.enabled_modules as any
+    if (existing && typeof existing === 'object') {
+      setModalModules({
+        agenda: existing.agenda ?? true,
+        servicios: existing.servicios ?? true,
+        staff: existing.staff ?? true,
+        statistics: existing.statistics ?? false,
+        marketing: existing.marketing ?? false,
+        whatsapp: existing.whatsapp ?? false,
+        clientes: existing.clientes ?? true,
+        caja: existing.caja ?? false,
+        inventario: existing.inventario ?? false,
+        ventas_mostrador: existing.ventas_mostrador ?? false,
+      })
+    } else {
+      const planSlug = tenant.subscription_plans?.slug || 'basico'
+      const defaults = PLAN_DEFAULTS[planSlug] || PLAN_DEFAULTS['basico']
+      setModalModules(defaults)
+    }
     
     setErrorMsg('')
     setIsAssignModalOpen(true)
@@ -299,10 +333,23 @@ export default function SubscriptionsPage() {
       nextForm.current_period_end = date.toISOString().split('T')[0]
     }
     
-    // If plan_id changes to empty, clear end dates and duration
+    // If plan_id changes
     if (updatedFields.plan_id === '') {
       nextForm.current_period_end = ''
       nextForm.duration = 'custom'
+      setModalModules(PLAN_DEFAULTS['basico'])
+    } else if (updatedFields.plan_id !== undefined) {
+      const selectedPlan = plans.find(p => p.id === updatedFields.plan_id)
+      const planSlug = selectedPlan?.slug || 'basico'
+      const defaults = PLAN_DEFAULTS[planSlug] || PLAN_DEFAULTS['basico']
+      setModalModules(defaults)
+
+      if (!nextForm.current_period_end) {
+        nextForm.duration = '30'
+        const date = new Date()
+        date.setDate(date.getDate() + 30)
+        nextForm.current_period_end = date.toISOString().split('T')[0]
+      }
     } else if (updatedFields.plan_id && !nextForm.current_period_end) {
       // If plan is selected and no end date is set, default to 30 days
       nextForm.duration = '30'
@@ -347,13 +394,7 @@ export default function SubscriptionsPage() {
       subscription_status: assignFormData.subscription_status,
       trial_ends_at: assignFormData.trial_ends_at ? new Date(assignFormData.trial_ends_at).toISOString() : null,
       current_period_end: assignFormData.current_period_end ? new Date(assignFormData.current_period_end).toISOString() : null,
-    }
-
-    if (assignFormData.plan_id !== editingTenant.plan_id) {
-      const selectedPlan = plans.find(p => p.id === assignFormData.plan_id)
-      const planSlug = selectedPlan?.slug || 'basico'
-      const defaultModules = PLAN_DEFAULTS[planSlug] || PLAN_DEFAULTS['basico']
-      payload.enabled_modules = defaultModules
+      enabled_modules: modalModules,
     }
 
     try {
@@ -819,6 +860,166 @@ export default function SubscriptionsPage() {
             onChange={(e) => handleAssignFormChange({ current_period_end: e.target.value })}
             disabled={assignFormData.duration !== 'custom'}
           />
+
+          {/* Módulos Habilitados */}
+          <div className="space-y-3 pt-2 border-t border-border-custom">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Módulos Habilitados</h4>
+              <button
+                type="button"
+                onClick={() => {
+                  const selectedPlan = plans.find(p => p.id === assignFormData.plan_id)
+                  const planSlug = selectedPlan?.slug || 'basico'
+                  setModalModules(PLAN_DEFAULTS[planSlug] || PLAN_DEFAULTS['basico'])
+                }}
+                className="text-[10px] text-primary hover:text-primary-hover font-semibold transition-colors cursor-pointer"
+              >
+                Cargar por Defecto
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[220px] overflow-y-auto pr-1">
+              {/* Agenda */}
+              <label className="flex items-start gap-2.5 p-2.5 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modalModules.agenda ?? true}
+                  onChange={(e) => setModalModules({ ...modalModules, agenda: e.target.checked })}
+                />
+                <div>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Agenda / Turnos</span>
+                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5">Calendario de turnos y agendamientos.</p>
+                </div>
+              </label>
+
+              {/* Servicios */}
+              <label className="flex items-start gap-2.5 p-2.5 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modalModules.servicios ?? true}
+                  onChange={(e) => setModalModules({ ...modalModules, servicios: e.target.checked })}
+                />
+                <div>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Catálogo Servicios</span>
+                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5">Tratamientos, cortes y precios del salón.</p>
+                </div>
+              </label>
+
+              {/* Staff */}
+              <label className="flex items-start gap-2.5 p-2.5 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modalModules.staff ?? true}
+                  onChange={(e) => setModalModules({ ...modalModules, staff: e.target.checked })}
+                />
+                <div>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Personal / Staff</span>
+                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5">Registro de estilistas y roles de acceso.</p>
+                </div>
+              </label>
+
+              {/* Clientes */}
+              <label className="flex items-start gap-2.5 p-2.5 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modalModules.clientes ?? true}
+                  onChange={(e) => setModalModules({ ...modalModules, clientes: e.target.checked })}
+                />
+                <div>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Fichas Clientes</span>
+                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5">Gestión de clientes, historial de visitas y compras.</p>
+                </div>
+              </label>
+
+              {/* Statistics */}
+              <label className="flex items-start gap-2.5 p-2.5 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modalModules.statistics ?? false}
+                  onChange={(e) => setModalModules({ ...modalModules, statistics: e.target.checked })}
+                />
+                <div>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Estadísticas / Reportes</span>
+                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5">Resumen diario, recaudación y ocupación.</p>
+                </div>
+              </label>
+
+              {/* Marketing */}
+              <label className="flex items-start gap-2.5 p-2.5 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modalModules.marketing ?? false}
+                  onChange={(e) => setModalModules({ ...modalModules, marketing: e.target.checked })}
+                />
+                <div>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Marketing y Promos</span>
+                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5">Herramientas de fidelización y campañas.</p>
+                </div>
+              </label>
+
+              {/* Whatsapp */}
+              <label className="flex items-start gap-2.5 p-2.5 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modalModules.whatsapp ?? false}
+                  onChange={(e) => setModalModules({ ...modalModules, whatsapp: e.target.checked })}
+                />
+                <div>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Recordatorios WhatsApp</span>
+                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5">Notificaciones automatizadas de turnos.</p>
+                </div>
+              </label>
+
+              {/* Caja */}
+              <label className="flex items-start gap-2.5 p-2.5 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modalModules.caja ?? false}
+                  onChange={(e) => setModalModules({ ...modalModules, caja: e.target.checked })}
+                />
+                <div>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Caja Diaria (POS)</span>
+                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5">Control de ingresos, egresos y reportes financieros.</p>
+                </div>
+              </label>
+
+              {/* Inventario */}
+              <label className="flex items-start gap-2.5 p-2.5 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modalModules.inventario ?? false}
+                  onChange={(e) => setModalModules({ ...modalModules, inventario: e.target.checked })}
+                />
+                <div>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Inventario y Stock</span>
+                  <p className="text-[9px] text-zinc-450 dark:text-zinc-500 mt-0.5">Catálogo, stock mínimo y bitácora de auditoría.</p>
+                </div>
+              </label>
+
+              {/* Venta Mostrador */}
+              <label className="flex items-start gap-2.5 p-2.5 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modalModules.ventas_mostrador ?? false}
+                  onChange={(e) => setModalModules({ ...modalModules, ventas_mostrador: e.target.checked })}
+                />
+                <div>
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Ventas Mostrador (POS)</span>
+                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5">Venta rápida de productos a clientes o consumidor final.</p>
+                </div>
+              </label>
+            </div>
+          </div>
 
           {/* Pricing Calculation Summary Box */}
           {selectedPlan && (
