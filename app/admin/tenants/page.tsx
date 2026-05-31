@@ -35,6 +35,7 @@ interface EnabledModules {
   clientes: boolean
   caja: boolean
   inventario: boolean
+  ventas_mostrador: boolean
 }
 
 const DEFAULT_MODULES: EnabledModules = {
@@ -47,6 +48,7 @@ const DEFAULT_MODULES: EnabledModules = {
   clientes: true,
   caja: false,
   inventario: false,
+  ventas_mostrador: false,
 }
 
 const PLAN_DEFAULTS: Record<string, EnabledModules> = {
@@ -60,6 +62,7 @@ const PLAN_DEFAULTS: Record<string, EnabledModules> = {
     clientes: true,
     caja: false,
     inventario: false,
+    ventas_mostrador: false,
   },
   pro: {
     agenda: true,
@@ -71,6 +74,7 @@ const PLAN_DEFAULTS: Record<string, EnabledModules> = {
     clientes: true,
     caja: true,
     inventario: true,
+    ventas_mostrador: true,
   },
   vip: {
     agenda: true,
@@ -82,6 +86,7 @@ const PLAN_DEFAULTS: Record<string, EnabledModules> = {
     clientes: true,
     caja: true,
     inventario: true,
+    ventas_mostrador: true,
   }
 }
 
@@ -163,6 +168,7 @@ export default function TenantsPage() {
         clientes: existing.clientes ?? true,
         caja: existing.caja ?? false,
         inventario: existing.inventario ?? false,
+        ventas_mostrador: existing.ventas_mostrador ?? false,
       })
     } else {
       setModulesConfig(DEFAULT_MODULES)
@@ -951,7 +957,21 @@ export default function TenantsPage() {
                 />
                 <div>
                   <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Inventario y Stock</span>
-                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Control de catálogo, stock mínimo, alertas y bitácora de auditoría.</p>
+                  <p className="text-[10px] text-zinc-450 dark:text-zinc-500 mt-0.5">Control de catálogo, stock mínimo, alertas y bitácora de auditoría.</p>
+                </div>
+              </label>
+ 
+              {/* Venta Mostrador */}
+              <label className="flex items-start gap-3 p-3 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modulesConfig.ventas_mostrador}
+                  onChange={(e) => setModulesConfig({ ...modulesConfig, ventas_mostrador: e.target.checked })}
+                />
+                <div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Ventas de Mostrador (POS)</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Venta rápida de productos a clientes o de forma anónima con facturación no-fiscal.</p>
                 </div>
               </label>
             </div>
