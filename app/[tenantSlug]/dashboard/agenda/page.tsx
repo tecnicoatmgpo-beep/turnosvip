@@ -1216,6 +1216,12 @@ export default function AgendaPage() {
         onClose={() => setIsDetailModalOpen(false)}
         title="Detalles del Turno"
       >
+        {errorMsg && (
+          <div className="p-3 mb-4 bg-rose-50 border border-rose-100 rounded-lg text-rose-750 text-xs flex items-start gap-2 dark:bg-rose-950/20 dark:border-rose-950/30 dark:text-rose-400">
+            <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-rose-600 dark:text-rose-400" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
         {selectedAppointment && (
           <div className="space-y-6">
             {/* Main Info */}
@@ -1362,6 +1368,12 @@ export default function AgendaPage() {
         title={editingAppointment ? 'Editar Turno' : 'Programar Nuevo Turno'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {errorMsg && (
+            <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg text-rose-750 text-xs flex items-start gap-2 dark:bg-rose-950/20 dark:border-rose-950/30 dark:text-rose-400">
+              <XCircle className="w-4 h-4 mt-0.5 shrink-0 text-rose-600 dark:text-rose-400" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
           <div>
             <label className="block text-xs font-semibold text-zinc-505 mb-1 dark:text-zinc-400 uppercase tracking-wide">
               Vincular a Cliente Registrado (Opcional)
