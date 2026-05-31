@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { Calendar, Store, Users, LogOut, Menu, X, Scissors, User, UserCheck, Wallet, Package } from 'lucide-react'
+import { Calendar, Store, Users, LogOut, Menu, X, Scissors, User, UserCheck, Wallet, Package, Settings } from 'lucide-react'
 
 export default function TenantDashboardLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
@@ -104,6 +104,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
     { name: 'Clientes', href: `/${tenantSlug}/dashboard/clientes`, icon: UserCheck, moduleKey: 'clientes' },
     { name: 'Servicios', href: `/${tenantSlug}/dashboard/servicios`, icon: Scissors, moduleKey: 'servicios' },
     { name: 'Personal (Staff)', href: `/${tenantSlug}/dashboard/staff`, icon: Users, moduleKey: 'staff' },
+    { name: 'Configuración', href: `/${tenantSlug}/dashboard/configuracion`, icon: Settings, moduleKey: 'configuracion' },
   ]
 
   const filteredMenuItems = menuItems.filter(item => {
@@ -134,8 +135,9 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
       else if (subpath === 'staff') currentKey = 'staff'
       else if (subpath === 'caja') currentKey = 'caja'
       else if (subpath === 'inventario') currentKey = 'inventario'
+      else if (subpath === 'configuracion') currentKey = 'configuracion'
 
-      const isStaffForbidden = rawRole === 'staff' && (currentKey === 'statistics' || currentKey === 'servicios' || currentKey === 'staff')
+      const isStaffForbidden = rawRole === 'staff' && (currentKey === 'statistics' || currentKey === 'servicios' || currentKey === 'staff' || currentKey === 'configuracion')
 
       if (enabledModules[currentKey] === false || isStaffForbidden) {
         // Find first enabled and allowed menu item to redirect to

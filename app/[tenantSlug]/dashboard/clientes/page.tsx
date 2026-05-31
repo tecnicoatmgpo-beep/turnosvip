@@ -582,12 +582,17 @@ export default function ClientesPage() {
 
       const { data: tenantData } = await supabase
         .from('tenants')
-        .select('name')
+        .select('name, address, cuit, phone, email, activity_start_date')
         .eq('id', tenantId)
         .single()
 
       setPostSaleDetails({
         tenantName: tenantData?.name || 'Mi Turno VIP',
+        tenantAddress: tenantData?.address || '',
+        tenantCuit: tenantData?.cuit || '',
+        tenantPhone: tenantData?.phone || '',
+        tenantEmail: tenantData?.email || '',
+        tenantActivityStart: tenantData?.activity_start_date || '',
         clientName: `${selectedCustomer.first_name} ${selectedCustomer.last_name}`,
         serviceOrProduct: `${payload.product_name} x ${payload.quantity}`
       })
@@ -1238,8 +1243,13 @@ export default function ClientesPage() {
             <div className="absolute top-0 left-0 w-full h-1 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-200 via-transparent to-transparent bg-repeat-x bg-[length:10px_4px]"></div>
             
             <div className="text-center space-y-1">
-              <h4 className="font-bold text-sm tracking-tight">{postSaleDetails?.tenantName.toUpperCase()}</h4>
-              <p className="text-[10px] text-zinc-450 dark:text-zinc-500">Ticket de Pago de Producto</p>
+              <h4 className="font-bold text-sm tracking-tight">{postSaleDetails?.tenantName?.toUpperCase()}</h4>
+              {postSaleDetails?.tenantCuit && <p className="text-[9px] text-zinc-550 dark:text-zinc-400">CUIT: {postSaleDetails.tenantCuit}</p>}
+              {postSaleDetails?.tenantAddress && <p className="text-[9px] text-zinc-550 dark:text-zinc-400">Dir: {postSaleDetails.tenantAddress}</p>}
+              {postSaleDetails?.tenantPhone && <p className="text-[9px] text-zinc-550 dark:text-zinc-400">Tel: {postSaleDetails.tenantPhone}</p>}
+              {postSaleDetails?.tenantEmail && <p className="text-[9px] text-zinc-550 dark:text-zinc-400">Email: {postSaleDetails.tenantEmail}</p>}
+              {postSaleDetails?.tenantActivityStart && <p className="text-[9px] text-zinc-550 dark:text-zinc-400">Inicio Act: {postSaleDetails.tenantActivityStart}</p>}
+              <p className="text-[10px] text-zinc-450 dark:text-zinc-500 mt-1 font-bold">Ticket de Pago de Producto</p>
               <p className="text-[9px] text-zinc-400 dark:text-zinc-500">
                 {postSaleTx && new Date(postSaleTx.created_at).toLocaleString()}
               </p>
@@ -1275,6 +1285,12 @@ export default function ClientesPage() {
 
             <div className="border-t border-dashed border-zinc-300 dark:border-zinc-700 my-3"></div>
 
+            <div className="text-center text-[10px] font-bold tracking-wider text-zinc-800 dark:text-zinc-200 bg-zinc-150 dark:bg-zinc-800/50 py-1 rounded">
+              NO VÁLIDO COMO FACTURA
+            </div>
+
+            <div className="border-t border-dashed border-zinc-300 dark:border-zinc-700 my-3"></div>
+
             <div className="text-center text-[9px] text-zinc-450 dark:text-zinc-500 space-y-0.5">
               <p>¡Gracias por su visita!</p>
               <p>miturnovip.com</p>
@@ -1301,7 +1317,12 @@ export default function ClientesPage() {
                 printDiv.innerHTML = `
                   <div style="text-align: center; margin-bottom: 15px;">
                     <h3 style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold;">${postSaleDetails?.tenantName?.toUpperCase() || ''}</h3>
-                    <p style="margin: 0; font-size: 10px;">Mi Turno VIP POS System</p>
+                    ${postSaleDetails?.tenantCuit ? `<p style="margin: 2px 0; font-size: 10px;">CUIT: ${postSaleDetails.tenantCuit}</p>` : ''}
+                    ${postSaleDetails?.tenantAddress ? `<p style="margin: 2px 0; font-size: 10px;">Dir: ${postSaleDetails.tenantAddress}</p>` : ''}
+                    ${postSaleDetails?.tenantPhone ? `<p style="margin: 2px 0; font-size: 10px;">Tel: ${postSaleDetails.tenantPhone}</p>` : ''}
+                    ${postSaleDetails?.tenantEmail ? `<p style="margin: 2px 0; font-size: 10px;">Email: ${postSaleDetails.tenantEmail}</p>` : ''}
+                    ${postSaleDetails?.tenantActivityStart ? `<p style="margin: 2px 0; font-size: 10px;">Inicio Act: ${postSaleDetails.tenantActivityStart}</p>` : ''}
+                    <p style="margin: 5px 0 0 0; font-size: 10px; font-weight: bold;">Mi Turno VIP POS System</p>
                     <p style="margin: 0; font-size: 10px;">Fecha: ${postSaleTx ? new Date(postSaleTx.created_at).toLocaleString() : ''}</p>
                   </div>
                   <div style="border-bottom: 1px dashed #000; margin-bottom: 10px;"></div>
@@ -1332,7 +1353,11 @@ export default function ClientesPage() {
                     <p style="margin: 3px 0"><strong>Método:</strong> ${postSaleTx ? (postSaleTx.payment_method === 'efectivo' ? 'Efectivo' : postSaleTx.payment_method === 'transferencia' ? 'Transferencia' : postSaleTx.payment_method === 'tarjeta_debito' ? 'Tarjeta Débito' : postSaleTx.payment_method === 'tarjeta_credito' ? 'Tarjeta Crédito' : 'MercadoPago') : ''}</p>
                     <p style="margin: 3px 0; font-size: 14px;"><strong>TOTAL:</strong> ${postSaleTx ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postSaleTx.amount) : ''}</p>
                   </div>
-                  <div style="border-bottom: 1px dashed #000; margin: 15px 0;"></div>
+                  <div style="border-bottom: 1px dashed #000; margin: 15px 0 10px 0;"></div>
+                  <div style="text-align: center; font-size: 11px; font-weight: bold; border: 1px solid #000; padding: 3px 0; margin-bottom: 10px;">
+                    NO VÁLIDO COMO FACTURA
+                  </div>
+                  <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
                   <div style="text-align: center; font-size: 10px;">
                     <p style="margin: 5px 0">¡Gracias por su visita!</p>
                     <p style="margin: 0">miturnovip.com</p>

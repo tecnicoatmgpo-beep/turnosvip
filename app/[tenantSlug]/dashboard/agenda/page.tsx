@@ -1495,8 +1495,19 @@ export default function AgendaPage() {
                     user: { first_name: currentUserName }
                   })
 
+                  const { data: tenantData } = await supabase
+                    .from('tenants')
+                    .select('name, address, cuit, phone, email, activity_start_date')
+                    .eq('id', tenantId)
+                    .single()
+
                   setPostCheckoutDetails({
-                    tenantName: 'Mi Turno VIP',
+                    tenantName: tenantData?.name || 'Mi Turno VIP',
+                    tenantAddress: tenantData?.address || '',
+                    tenantCuit: tenantData?.cuit || '',
+                    tenantPhone: tenantData?.phone || '',
+                    tenantEmail: tenantData?.email || '',
+                    tenantActivityStart: tenantData?.activity_start_date || '',
                     clientName: checkoutAppointment.client_name,
                     serviceOrProduct: checkoutAppointment.services?.name || 'Servicio de Estética'
                   })
@@ -1533,8 +1544,13 @@ export default function AgendaPage() {
             <div className="absolute top-0 left-0 w-full h-1 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-200 via-transparent to-transparent bg-repeat-x bg-[length:10px_4px]"></div>
             
             <div className="text-center space-y-1">
-              <h4 className="font-bold text-sm tracking-tight">{postCheckoutDetails?.tenantName.toUpperCase()}</h4>
-              <p className="text-[10px] text-zinc-450 dark:text-zinc-500">Ticket de Pago de Servicio</p>
+              <h4 className="font-bold text-sm tracking-tight">{postCheckoutDetails?.tenantName?.toUpperCase()}</h4>
+              {postCheckoutDetails?.tenantCuit && <p className="text-[9px] text-zinc-550 dark:text-zinc-400">CUIT: {postCheckoutDetails.tenantCuit}</p>}
+              {postCheckoutDetails?.tenantAddress && <p className="text-[9px] text-zinc-550 dark:text-zinc-400">Dir: {postCheckoutDetails.tenantAddress}</p>}
+              {postCheckoutDetails?.tenantPhone && <p className="text-[9px] text-zinc-550 dark:text-zinc-400">Tel: {postCheckoutDetails.tenantPhone}</p>}
+              {postCheckoutDetails?.tenantEmail && <p className="text-[9px] text-zinc-550 dark:text-zinc-400">Email: {postCheckoutDetails.tenantEmail}</p>}
+              {postCheckoutDetails?.tenantActivityStart && <p className="text-[9px] text-zinc-550 dark:text-zinc-400">Inicio Act: {postCheckoutDetails.tenantActivityStart}</p>}
+              <p className="text-[10px] text-zinc-450 dark:text-zinc-500 font-bold mt-1">Ticket de Pago de Servicio</p>
               <p className="text-[9px] text-zinc-400 dark:text-zinc-500">
                 {postCheckoutTx && new Date(postCheckoutTx.created_at).toLocaleString()}
               </p>
@@ -1566,6 +1582,12 @@ export default function AgendaPage() {
 
             <div className="border-t border-dashed border-zinc-300 dark:border-zinc-700 my-3"></div>
 
+            <div className="text-center text-[10px] font-bold tracking-wider text-zinc-800 dark:text-zinc-200 bg-zinc-150 dark:bg-zinc-800/50 py-1 rounded">
+              NO VÁLIDO COMO FACTURA
+            </div>
+
+            <div className="border-t border-dashed border-zinc-300 dark:border-zinc-700 my-3"></div>
+
             <div className="text-center text-[9px] text-zinc-450 dark:text-zinc-500 space-y-0.5">
               <p>¡Gracias por elegirnos!</p>
               <p>miturnovip.com</p>
@@ -1592,7 +1614,12 @@ export default function AgendaPage() {
                 printDiv.innerHTML = `
                   <div style="text-align: center; margin-bottom: 15px;">
                     <h3 style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold;">${postCheckoutDetails?.tenantName?.toUpperCase() || ''}</h3>
-                    <p style="margin: 0; font-size: 10px;">Mi Turno VIP POS System</p>
+                    ${postCheckoutDetails?.tenantCuit ? `<p style="margin: 2px 0; font-size: 10px;">CUIT: ${postCheckoutDetails.tenantCuit}</p>` : ''}
+                    ${postCheckoutDetails?.tenantAddress ? `<p style="margin: 2px 0; font-size: 10px;">Dir: ${postCheckoutDetails.tenantAddress}</p>` : ''}
+                    ${postCheckoutDetails?.tenantPhone ? `<p style="margin: 2px 0; font-size: 10px;">Tel: ${postCheckoutDetails.tenantPhone}</p>` : ''}
+                    ${postCheckoutDetails?.tenantEmail ? `<p style="margin: 2px 0; font-size: 10px;">Email: ${postCheckoutDetails.tenantEmail}</p>` : ''}
+                    ${postCheckoutDetails?.tenantActivityStart ? `<p style="margin: 2px 0; font-size: 10px;">Inicio Act: ${postCheckoutDetails.tenantActivityStart}</p>` : ''}
+                    <p style="margin: 5px 0 0 0; font-size: 10px; font-weight: bold;">Mi Turno VIP POS System</p>
                     <p style="margin: 0; font-size: 10px;">Fecha: ${postCheckoutTx ? new Date(postCheckoutTx.created_at).toLocaleString() : ''}</p>
                   </div>
                   <div style="border-bottom: 1px dashed #000; margin-bottom: 10px;"></div>
@@ -1623,7 +1650,11 @@ export default function AgendaPage() {
                     <p style="margin: 3px 0"><strong>Método:</strong> ${postCheckoutTx ? (postCheckoutTx.payment_method === 'efectivo' ? 'Efectivo' : postCheckoutTx.payment_method === 'transferencia' ? 'Transferencia' : postCheckoutTx.payment_method === 'tarjeta_debito' ? 'Tarjeta Débito' : postCheckoutTx.payment_method === 'tarjeta_credito' ? 'Tarjeta Crédito' : 'MercadoPago') : ''}</p>
                     <p style="margin: 3px 0; font-size: 14px;"><strong>TOTAL:</strong> ${postCheckoutTx ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postCheckoutTx.amount) : ''}</p>
                   </div>
-                  <div style="border-bottom: 1px dashed #000; margin: 15px 0;"></div>
+                  <div style="border-bottom: 1px dashed #000; margin: 15px 0 10px 0;"></div>
+                  <div style="text-align: center; font-size: 11px; font-weight: bold; border: 1px solid #000; padding: 3px 0; margin-bottom: 10px;">
+                    NO VÁLIDO COMO FACTURA
+                  </div>
+                  <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
                   <div style="text-align: center; font-size: 10px;">
                     <p style="margin: 5px 0">¡Gracias por su visita!</p>
                     <p style="margin: 0">miturnovip.com</p>
