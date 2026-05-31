@@ -95,6 +95,7 @@ export default function InventoryPage() {
   const [prodDescription, setProdDescription] = useState('')
   const [prodCategory, setProdCategory] = useState('Capilares')
   const [prodCostPrice, setProdCostPrice] = useState('0')
+  const [prodMargin, setProdMargin] = useState('0')
   const [prodSalePrice, setProdSalePrice] = useState('0')
   const [prodInitialStock, setProdInitialStock] = useState('0')
   const [prodMinStock, setProdMinStock] = useState('3')
@@ -201,6 +202,7 @@ export default function InventoryPage() {
     setProdDescription('')
     setProdCategory('Capilares')
     setProdCostPrice('0')
+    setProdMargin('0')
     setProdSalePrice('0')
     setProdInitialStock('0')
     setProdMinStock('3')
@@ -216,10 +218,47 @@ export default function InventoryPage() {
     setProdCategory(product.category)
     setProdCostPrice(product.cost_price.toString())
     setProdSalePrice(product.sale_price.toString())
+    
+    // Calculate initial margin
+    const cost = product.cost_price
+    const sale = product.sale_price
+    const margin = cost > 0 ? ((sale - cost) / cost) * 100 : 0
+    setProdMargin(Number(margin.toFixed(2)).toString())
+
     setProdInitialStock(product.stock.toString()) // read-only on edit
     setProdMinStock(product.min_stock.toString())
     setProdSupplier(product.supplier || '')
     setIsProductModalOpen(true)
+  }
+
+  const handleCostChange = (val: string) => {
+    setProdCostPrice(val)
+    const cost = Number(val)
+    const margin = Number(prodMargin)
+    if (!isNaN(cost) && !isNaN(margin)) {
+      const sale = cost + (cost * (margin / 100))
+      setProdSalePrice(Number(sale.toFixed(2)).toString())
+    }
+  }
+
+  const handleMarginChange = (val: string) => {
+    setProdMargin(val)
+    const cost = Number(prodCostPrice)
+    const margin = Number(val)
+    if (!isNaN(cost) && !isNaN(margin)) {
+      const sale = cost + (cost * (margin / 100))
+      setProdSalePrice(Number(sale.toFixed(2)).toString())
+    }
+  }
+
+  const handleSaleChange = (val: string) => {
+    setProdSalePrice(val)
+    const cost = Number(prodCostPrice)
+    const sale = Number(val)
+    if (!isNaN(cost) && cost > 0 && !isNaN(sale)) {
+      const margin = ((sale - cost) / cost) * 100
+      setProdMargin(Number(margin.toFixed(2)).toString())
+    }
   }
 
   const handleSubmitProduct = async (e: React.FormEvent) => {
@@ -770,45 +809,58 @@ export default function InventoryPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-zinc-50 dark:bg-zinc-900/20 p-4 border border-border-custom rounded-xl">
-            <Input
-              label="Precio Costo"
-              type="number"
-              min="0"
-              step="any"
-              required
-              value={prodCostPrice}
-              onChange={(e) => setProdCostPrice(e.target.value)}
-            />
+          <div className="bg-zinc-50 dark:bg-zinc-900/20 p-4 border border-border-custom rounded-xl space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input
+                label="Precio Costo ($)"
+                type="number"
+                min="0"
+                step="any"
+                required
+                value={prodCostPrice}
+                onChange={(e) => handleCostChange(e.target.value)}
+              />
 
-            <Input
-              label="Precio Venta"
-              type="number"
-              min="0"
-              step="any"
-              required
-              value={prodSalePrice}
-              onChange={(e) => setProdSalePrice(e.target.value)}
-            />
+              <Input
+                label="Margen (%)"
+                type="number"
+                step="any"
+                placeholder="Ej: 50"
+                value={prodMargin}
+                onChange={(e) => handleMarginChange(e.target.value)}
+              />
 
-            <Input
-              label={editingProduct ? "Stock (Bloqueado)" : "Stock Inicial"}
-              type="number"
-              min="0"
-              required
-              disabled={!!editingProduct}
-              value={prodInitialStock}
-              onChange={(e) => setProdInitialStock(e.target.value)}
-            />
+              <Input
+                label="Precio Venta ($)"
+                type="number"
+                min="0"
+                step="any"
+                required
+                value={prodSalePrice}
+                onChange={(e) => handleSaleChange(e.target.value)}
+              />
+            </div>
 
-            <Input
-              label="Stock Mínimo (Alerta)"
-              type="number"
-              min="0"
-              required
-              value={prodMinStock}
-              onChange={(e) => setProdMinStock(e.target.value)}
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label={editingProduct ? "Stock (Bloqueado)" : "Stock Inicial"}
+                type="number"
+                min="0"
+                required
+                disabled={!!editingProduct}
+                value={prodInitialStock}
+                onChange={(e) => setProdInitialStock(e.target.value)}
+              />
+
+              <Input
+                label="Stock Mínimo (Alerta)"
+                type="number"
+                min="0"
+                required
+                value={prodMinStock}
+                onChange={(e) => setProdMinStock(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border-custom">
