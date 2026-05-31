@@ -1495,11 +1495,24 @@ export default function AgendaPage() {
                     user: { first_name: currentUserName }
                   })
 
-                  const { data: tenantData } = await supabase
+                  let tenantData: any = null
+                  const { data: fullTenant, error: tenantErr } = await supabase
                     .from('tenants')
                     .select('name, address, cuit, phone, email, activity_start_date')
                     .eq('id', tenantId)
                     .single()
+
+                  if (tenantErr) {
+                    console.warn('Could not query full tenant details, falling back to name only:', tenantErr.message)
+                    const { data: basicTenant } = await supabase
+                      .from('tenants')
+                      .select('name')
+                      .eq('id', tenantId)
+                      .single()
+                    tenantData = basicTenant
+                  } else {
+                    tenantData = fullTenant
+                  }
 
                   setPostCheckoutDetails({
                     tenantName: tenantData?.name || 'Mi Turno VIP',

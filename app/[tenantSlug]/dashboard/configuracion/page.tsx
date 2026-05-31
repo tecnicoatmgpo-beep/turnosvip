@@ -33,6 +33,7 @@ export default function ConfigurationPage() {
   useEffect(() => {
     const fetchTenantData = async () => {
       setLoading(true)
+      setErrorMsg('')
       try {
         const supabase = createClient()
         const { data: tenant, error } = await supabase
@@ -41,9 +42,27 @@ export default function ConfigurationPage() {
           .eq('slug', tenantSlug)
           .single()
 
-        if (error) throw error
+        if (error) {
+          if (error.message.includes('address') || error.message.includes('does not exist')) {
+            console.warn('Columns do not exist in the tenants table. Please execute config_migration.sql.')
+            
+            const { data: basicTenant, error: basicError } = await supabase
+              .from('tenants')
+              .select('id, name')
+              .eq('slug', tenantSlug)
+              .single()
 
-        if (tenant) {
+            if (basicError) throw basicError
+
+            if (basicTenant) {
+              setTenantId(basicTenant.id)
+              setName(basicTenant.name || '')
+              setErrorMsg('Falta ejecutar la migración SQL. Por favor, copia y ejecuta el archivo "config_migration.sql" en el panel SQL Editor de Supabase para poder configurar los datos adicionales.')
+            }
+          } else {
+            throw error
+          }
+        } else if (tenant) {
           setTenantId(tenant.id)
           setName(tenant.name || '')
           setAddress(tenant.address || '')
@@ -88,7 +107,12 @@ export default function ConfigurationPage() {
         })
         .eq('id', tenantId)
 
-      if (error) throw error
+      if (error) {
+        if (error.message.includes('address') || error.message.includes('does not exist')) {
+          throw new Error('No se pueden guardar las configuraciones adicionales. Por favor, ejecuta la migración "config_migration.sql" en Supabase primero.')
+        }
+        throw error
+      }
 
       setSuccessMsg('Configuración guardada correctamente.')
       // Refresh the page data
