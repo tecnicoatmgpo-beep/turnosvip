@@ -130,6 +130,7 @@ export default function AgendaPage() {
   const [checkoutAppointment, setCheckoutAppointment] = useState<Appointment | null>(null)
   const [checkoutPaymentMethod, setCheckoutPaymentMethod] = useState<'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito' | 'mercadopago'>('efectivo')
   const [isCajaOpen, setIsCajaOpen] = useState<boolean>(false)
+  const [checkingCaja, setCheckingCaja] = useState<boolean>(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
 
@@ -460,6 +461,7 @@ export default function AgendaPage() {
       setCheckoutPaymentMethod('efectivo')
       setCheckoutError('')
       setCheckoutLoading(false)
+      setCheckingCaja(true)
       setIsCheckoutModalOpen(true)
 
       try {
@@ -468,6 +470,8 @@ export default function AgendaPage() {
         setIsCajaOpen(res.ok && data.isOpen)
       } catch (e) {
         setIsCajaOpen(false)
+      } finally {
+        setCheckingCaja(false)
       }
       return
     }
@@ -1696,7 +1700,12 @@ export default function AgendaPage() {
             </div>
           )}
 
-          {!isCajaOpen ? (
+          {checkingCaja ? (
+            <div className="p-8 flex flex-col items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400">
+              <RefreshCw className="w-6 h-6 animate-spin text-primary" />
+              <span className="text-xs font-semibold">Verificando estado de la caja...</span>
+            </div>
+          ) : !isCajaOpen ? (
             <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex gap-3 text-xs text-rose-800">
               <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div>
@@ -1908,7 +1917,7 @@ export default function AgendaPage() {
                   setCheckoutLoading(false)
                 }
               }}
-              disabled={!isCajaOpen || checkoutLoading}
+              disabled={checkingCaja || !isCajaOpen || checkoutLoading}
               className="bg-primary hover:bg-primary-accent text-white font-semibold cursor-pointer"
             >
               {checkoutLoading ? 'Procesando...' : 'Confirmar Cobro'}
