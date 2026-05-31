@@ -29,7 +29,8 @@ import {
   X,
   Filter,
   Sparkles,
-  Heart
+  Heart,
+  Printer
 } from 'lucide-react'
 
 interface Service {
@@ -91,6 +92,7 @@ export default function AgendaPage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [tenantId, setTenantId] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [currentUserName, setCurrentUserName] = useState<string>('')
   
   // Data
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -111,6 +113,19 @@ export default function AgendaPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
 
+  // Checkout POS State
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false)
+  const [checkoutAppointment, setCheckoutAppointment] = useState<Appointment | null>(null)
+  const [checkoutPaymentMethod, setCheckoutPaymentMethod] = useState<'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito' | 'mercadopago'>('efectivo')
+  const [isCajaOpen, setIsCajaOpen] = useState<boolean>(false)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [checkoutError, setCheckoutError] = useState('')
+
+  // Post Checkout Ticket modal
+  const [isPostCheckoutTicketOpen, setIsPostCheckoutTicketOpen] = useState(false)
+  const [postCheckoutTx, setPostCheckoutTx] = useState<any>(null)
+  const [postCheckoutDetails, setPostCheckoutDetails] = useState<any>(null)
+
   // Form State
   const [formData, setFormData] = useState({
     client_name: '',
@@ -122,7 +137,8 @@ export default function AgendaPage() {
     total_price: '0.00',
     notes: '',
     status: 'confirmed' as Appointment['status'],
-    customer_id: ''
+    customer_id: '',
+    payment_method: 'efectivo' as 'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito' | 'mercadopago'
   })
 
   const supabase = createClient()
@@ -187,16 +203,17 @@ export default function AgendaPage() {
 
       setCustomers(customersData || [])
 
-      // 6. Fetch User Role
+      // 6. Fetch User Role & Profile
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: profile } = await supabase
           .from('users')
-          .select('role')
+          .select('role, first_name, last_name')
           .eq('id', user.id)
           .single()
         if (profile) {
           setUserRole(profile.role)
+          setCurrentUserName(`${profile.first_name || ''} ${profile.last_name || ''}`.trim() || user.email?.split('@')[0] || '')
         }
       }
     } catch (err: any) {
@@ -301,14 +318,29 @@ export default function AgendaPage() {
       total_price: services[0]?.price.toString() || '0.00',
       notes: '',
       status: 'confirmed',
-      customer_id: ''
+      customer_id: '',
+      payment_method: 'efectivo'
     })
     setIsModalOpen(true)
   }
 
   // Open Edit Modal
-  const handleOpenEditModal = (appt: Appointment) => {
+  const handleOpenEditModal = async (appt: Appointment) => {
     setEditingAppointment(appt)
+    
+    // Fetch payment method if already completed
+    let paymentMethod: any = 'efectivo'
+    if (appt.status === 'completed') {
+      const { data: tx } = await supabase
+        .from('cash_transactions')
+        .select('payment_method')
+        .eq('reference_id', appt.id)
+        .maybeSingle()
+      if (tx) {
+        paymentMethod = tx.payment_method
+      }
+    }
+
     setFormData({
       client_name: appt.client_name,
       client_phone: appt.client_phone || '',
@@ -319,7 +351,8 @@ export default function AgendaPage() {
       total_price: appt.total_price.toString(),
       notes: appt.notes || '',
       status: appt.status,
-      customer_id: appt.customer_id || ''
+      customer_id: appt.customer_id || '',
+      payment_method: paymentMethod
     })
     setIsDetailModalOpen(false)
     setIsModalOpen(true)
@@ -327,7 +360,35 @@ export default function AgendaPage() {
 
   // Quick Action to Change Status
   const handleQuickStatusChange = async (appt: Appointment, newStatus: Appointment['status']) => {
+    if (newStatus === 'completed') {
+      // Intercept and open checkout modal
+      setIsDetailModalOpen(false)
+      setCheckoutAppointment(appt)
+      setCheckoutPaymentMethod('efectivo')
+      setCheckoutError('')
+      setCheckoutLoading(false)
+      setIsCheckoutModalOpen(true)
+
+      try {
+        const res = await fetch('/api/tenant/caja/status')
+        const data = await res.json()
+        setIsCajaOpen(res.ok && data.isOpen)
+      } catch (e) {
+        setIsCajaOpen(false)
+      }
+      return
+    }
+
     try {
+      // If we are reverting a completed appointment, delete the associated cash transaction
+      if (appt.status === 'completed') {
+        const { error: deleteTxErr } = await supabase
+          .from('cash_transactions')
+          .delete()
+          .eq('reference_id', appt.id)
+        if (deleteTxErr) throw deleteTxErr
+      }
+
       const { error } = await supabase
         .from('appointments')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -383,6 +444,28 @@ export default function AgendaPage() {
     }
 
     try {
+      // 1. Verify Cash Register is open if setting status to Completed
+      let activeRegister: any = null
+      if (payload.status === 'completed') {
+        const res = await fetch('/api/tenant/caja/status')
+        const statusData = await res.json()
+        if (!res.ok || !statusData.isOpen) {
+          throw new Error('No se puede completar el turno: la caja diaria está cerrada. Por favor, abre la caja en la sección de Caja antes de registrar cobros.')
+        }
+        activeRegister = statusData.register
+      }
+
+      let apptId = editingAppointment?.id || ''
+
+      // 2. Revert completed transaction if changing status away from completed
+      if (editingAppointment && editingAppointment.status === 'completed' && payload.status !== 'completed') {
+        await supabase
+          .from('cash_transactions')
+          .delete()
+          .eq('reference_id', editingAppointment.id)
+      }
+
+      // 3. Save Appointment
       if (editingAppointment) {
         const { error } = await supabase
           .from('appointments')
@@ -392,13 +475,58 @@ export default function AgendaPage() {
         if (error) throw error
         showNotification('Turno actualizado con éxito', 'success')
       } else {
-        const { error } = await supabase
+        const { data: newAppt, error } = await supabase
           .from('appointments')
           .insert([payload])
+          .select('id')
+          .single()
 
         if (error) throw error
+        apptId = newAppt.id
         showNotification('Turno creado con éxito', 'success')
       }
+
+      // 4. Handle Cash Transaction insertion/update if completed
+      if (payload.status === 'completed' && activeRegister) {
+        // Check if there is an existing transaction
+        const { data: existingTx } = await supabase
+          .from('cash_transactions')
+          .select('id')
+          .eq('reference_id', apptId)
+          .maybeSingle()
+
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (existingTx) {
+          // Update transaction
+          const { error: txErr } = await supabase
+            .from('cash_transactions')
+            .update({
+              amount: payload.total_price,
+              payment_method: formData.payment_method,
+              notes: `Cobro de turno - Cliente: ${payload.client_name}`
+            })
+            .eq('id', existingTx.id)
+          if (txErr) throw txErr
+        } else {
+          // Insert transaction
+          const { error: txErr } = await supabase
+            .from('cash_transactions')
+            .insert({
+              tenant_id: tenantId,
+              register_id: activeRegister.id,
+              user_id: user?.id || '',
+              type: 'income',
+              amount: payload.total_price,
+              payment_method: formData.payment_method,
+              category: 'servicio',
+              reference_id: apptId,
+              notes: `Cobro de turno - Cliente: ${payload.client_name}`
+            })
+          if (txErr) throw txErr
+        }
+      }
+
       setIsModalOpen(false)
       loadData()
     } catch (err: any) {
@@ -1193,17 +1321,34 @@ export default function AgendaPage() {
           </div>
 
           {editingAppointment && (
-            <Select
-              label="Estado del Turno"
-              options={[
-                { label: 'Pendiente', value: 'pending' },
-                { label: 'Confirmado', value: 'confirmed' },
-                { label: 'Completado', value: 'completed' },
-                { label: 'Cancelado', value: 'canceled' },
-              ]}
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as Appointment['status'] })}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Select
+                label="Estado del Turno"
+                options={[
+                  { label: 'Pendiente', value: 'pending' },
+                  { label: 'Confirmado', value: 'confirmed' },
+                  { label: 'Completado', value: 'completed' },
+                  { label: 'Cancelado', value: 'canceled' },
+                ]}
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as Appointment['status'] })}
+              />
+
+              {formData.status === 'completed' && (
+                <Select
+                  label="Método de Pago"
+                  options={[
+                    { label: 'Efectivo', value: 'efectivo' },
+                    { label: 'Transferencia Bancaria', value: 'transferencia' },
+                    { label: 'Tarjeta de Débito', value: 'tarjeta_debito' },
+                    { label: 'Tarjeta de Crédito', value: 'tarjeta_credito' },
+                    { label: 'MercadoPago', value: 'mercadopago' },
+                  ]}
+                  value={formData.payment_method}
+                  onChange={(e) => setFormData({ ...formData, payment_method: e.target.value as any })}
+                />
+              )}
+            </div>
           )}
 
           <div>
@@ -1227,6 +1372,290 @@ export default function AgendaPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* MODAL: COBRAR TURNO (QUICK CHECKOUT) */}
+      <Modal
+        isOpen={isCheckoutModalOpen}
+        onClose={() => setIsCheckoutModalOpen(false)}
+        title="Cobrar Turno - Registrar Pago"
+        size="md"
+      >
+        <div className="space-y-5">
+          {checkoutError && (
+            <div className="p-3 bg-rose-50 border border-rose-250 rounded-lg text-rose-700 text-xs font-semibold">
+              {checkoutError}
+            </div>
+          )}
+
+          {checkoutAppointment && (
+            <div className="p-4 bg-zinc-50 dark:bg-zinc-900 border border-border-custom rounded-xl space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Cliente:</span>
+                <span className="font-bold text-zinc-900 dark:text-zinc-50">{checkoutAppointment.client_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Servicio:</span>
+                <span className="font-bold text-zinc-900 dark:text-zinc-50">
+                  {checkoutAppointment.services?.name || 'Servicio Contratado'}
+                </span>
+              </div>
+              <div className="border-t border-border-custom my-2"></div>
+              <div className="flex justify-between text-sm font-bold">
+                <span>Total a Cobrar:</span>
+                <span className="text-primary">
+                  {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(checkoutAppointment.total_price)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {!isCajaOpen ? (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex gap-3 text-xs text-rose-800">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold">Caja Diaria Cerrada</h4>
+                <p className="mt-0.5">
+                  No puedes completar el cobro de este turno porque la caja diaria está cerrada. Por favor, ve al módulo de **Caja** y abre la sesión del día antes de continuar.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-650 dark:text-zinc-350">Selecciona el Método de Pago</label>
+              <Select
+                value={checkoutPaymentMethod}
+                onChange={(e) => setCheckoutPaymentMethod(e.target.value as any)}
+                options={[
+                  { label: 'Efectivo', value: 'efectivo' },
+                  { label: 'Transferencia Bancaria', value: 'transferencia' },
+                  { label: 'Tarjeta de Débito', value: 'tarjeta_debito' },
+                  { label: 'Tarjeta de Crédito', value: 'tarjeta_credito' },
+                  { label: 'MercadoPago', value: 'mercadopago' },
+                ]}
+              />
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-border-custom">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCheckoutModalOpen(false)}
+              disabled={checkoutLoading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!checkoutAppointment) return
+                setCheckoutLoading(true)
+                setCheckoutError('')
+                try {
+                  const { data: { user } } = await supabase.auth.getUser()
+                  
+                  // 1. Fetch active session register details
+                  const res = await fetch('/api/tenant/caja/status')
+                  const statusData = await res.json()
+                  if (!res.ok || !statusData.isOpen) {
+                    throw new Error('La caja se encuentra cerrada.')
+                  }
+
+                  // 2. Register Cash Transaction
+                  const txRes = await fetch('/api/tenant/caja/transaction', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      type: 'income',
+                      amount: checkoutAppointment.total_price,
+                      payment_method: checkoutPaymentMethod,
+                      category: 'servicio',
+                      reference_id: checkoutAppointment.id,
+                      notes: `Cobro de turno - Cliente: ${checkoutAppointment.client_name}`
+                    })
+                  })
+                  const txData = await txRes.json()
+                  if (!txRes.ok) throw new Error(txData.error)
+
+                  // 3. Update appointment status in DB
+                  const { error: apptErr } = await supabase
+                    .from('appointments')
+                    .update({ status: 'completed', updated_at: new Date().toISOString() })
+                    .eq('id', checkoutAppointment.id)
+                  
+                  if (apptErr) throw apptErr
+
+                  // Load ticket print preview data
+                  setPostCheckoutTx({
+                    id: txData.transaction.id,
+                    created_at: txData.transaction.created_at,
+                    amount: txData.transaction.amount,
+                    payment_method: txData.transaction.payment_method,
+                    category: txData.transaction.category,
+                    user: { first_name: currentUserName }
+                  })
+
+                  setPostCheckoutDetails({
+                    tenantName: 'Mi Turno VIP',
+                    clientName: checkoutAppointment.client_name,
+                    serviceOrProduct: checkoutAppointment.services?.name || 'Servicio de Estética'
+                  })
+
+                  setIsCheckoutModalOpen(false)
+                  loadData()
+                  showNotification('Turno cobrado y completado con éxito', 'success')
+                  setIsPostCheckoutTicketOpen(true)
+                } catch (err: any) {
+                  setCheckoutError(err.message || 'Error al completar el cobro')
+                } finally {
+                  setCheckoutLoading(false)
+                }
+              }}
+              disabled={!isCajaOpen || checkoutLoading}
+              className="bg-primary hover:bg-primary-accent text-white font-semibold cursor-pointer"
+            >
+              {checkoutLoading ? 'Procesando...' : 'Confirmar Cobro'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* MODAL: POST CHECKOUT TICKET PRINT PREVIEW */}
+      <Modal
+        isOpen={isPostCheckoutTicketOpen}
+        onClose={() => setIsPostCheckoutTicketOpen(false)}
+        title="Turno Cobrado con Éxito - Generar Recibo"
+        size="md"
+      >
+        <div className="space-y-6">
+          {/* Thermal Ticket Monospace view */}
+          <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-inner max-w-sm mx-auto font-mono text-zinc-900 dark:text-zinc-100 relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-200 via-transparent to-transparent bg-repeat-x bg-[length:10px_4px]"></div>
+            
+            <div className="text-center space-y-1">
+              <h4 className="font-bold text-sm tracking-tight">{postCheckoutDetails?.tenantName.toUpperCase()}</h4>
+              <p className="text-[10px] text-zinc-450 dark:text-zinc-500">Ticket de Pago de Servicio</p>
+              <p className="text-[9px] text-zinc-400 dark:text-zinc-500">
+                {postCheckoutTx && new Date(postCheckoutTx.created_at).toLocaleString()}
+              </p>
+            </div>
+            
+            <div className="border-t border-dashed border-zinc-300 dark:border-zinc-700 my-3"></div>
+            
+            <div className="text-[10px] space-y-1">
+              <p><strong>N°:</strong> #{postCheckoutTx?.id.slice(0, 8).toUpperCase()}</p>
+              <p><strong>Atendido por:</strong> {postCheckoutTx?.user?.first_name || 'Personal'}</p>
+              <p><strong>Cliente:</strong> {postCheckoutDetails?.clientName}</p>
+            </div>
+            
+            <div className="border-t border-dashed border-zinc-300 dark:border-zinc-700 my-3"></div>
+            
+            <div className="space-y-2 text-[10px]">
+              <div className="flex justify-between">
+                <span className="font-bold">{postCheckoutDetails?.serviceOrProduct}</span>
+                <span>{postCheckoutTx && new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postCheckoutTx.amount)}</span>
+              </div>
+            </div>
+
+            <div className="border-t border-dashed border-zinc-300 dark:border-zinc-700 my-3"></div>
+
+            <div className="text-right text-[10px] space-y-1">
+              <p>Método de Pago: {postCheckoutTx ? (postCheckoutTx.payment_method === 'efectivo' ? 'Efectivo' : postCheckoutTx.payment_method === 'transferencia' ? 'Transferencia' : postCheckoutTx.payment_method === 'tarjeta_debito' ? 'Tarjeta Débito' : postCheckoutTx.payment_method === 'tarjeta_credito' ? 'Tarjeta Crédito' : 'MercadoPago') : ''}</p>
+              <p className="font-bold text-sm">TOTAL: {postCheckoutTx && new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postCheckoutTx.amount)}</p>
+            </div>
+
+            <div className="border-t border-dashed border-zinc-300 dark:border-zinc-700 my-3"></div>
+
+            <div className="text-center text-[9px] text-zinc-450 dark:text-zinc-500 space-y-0.5">
+              <p>¡Gracias por elegirnos!</p>
+              <p>miturnovip.com</p>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex justify-center gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsPostCheckoutTicketOpen(false)}
+            >
+              Cerrar
+            </Button>
+            <Button
+              onClick={() => {
+                // Setup print-only ticket elements in window
+                const printDiv = document.createElement('div')
+                printDiv.id = 'thermal-ticket'
+                printDiv.style.fontFamily = 'monospace'
+                printDiv.style.fontSize = '12px'
+                printDiv.style.padding = '10px'
+                printDiv.style.width = '80mm'
+                printDiv.innerHTML = `
+                  <div style="text-align: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold;">\${postCheckoutDetails?.tenantName.toUpperCase()}</h3>
+                    <p style="margin: 0; font-size: 10px;">Mi Turno VIP POS System</p>
+                    <p style="margin: 0; font-size: 10px;">Fecha: \${new Date(postCheckoutTx.created_at).toLocaleString()}</p>
+                  </div>
+                  <div style="border-bottom: 1px dashed #000; margin-bottom: 10px;"></div>
+                  <div style="font-size: 11px; margin-bottom: 10px;">
+                    <p style="margin: 3px 0"><strong>Ticket ID:</strong> #\${postCheckoutTx.id.slice(0, 8).toUpperCase()}</p>
+                    <p style="margin: 3px 0"><strong>Atendido por:</strong> \${postCheckoutTx.user?.first_name || 'Personal'}</p>
+                    <p style="margin: 3px 0"><strong>Cliente:</strong> \${postCheckoutDetails.clientName}</p>
+                  </div>
+                  <div style="border-bottom: 1px dashed #000; margin-bottom: 10px;"></div>
+                  <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                    <thead>
+                      <tr style="border-bottom: 1px solid #000;">
+                        <th style="text-align: left; padding-bottom: 5px;">Concepto</th>
+                        <th style="text-align: right; padding-bottom: 5px;">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style="padding-top: 5px;">\${postCheckoutDetails.serviceOrProduct}</td>
+                        <td style="text-align: right; padding-top: 5px; font-weight: bold;">
+                          \${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postCheckoutTx.amount)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div style="border-bottom: 1px dashed #000; margin: 15px 0 10px 0;"></div>
+                  <div style="font-size: 11px; text-align: right;">
+                    <p style="margin: 3px 0"><strong>Método:</strong> \${postCheckoutTx.payment_method === 'efectivo' ? 'Efectivo' : postCheckoutTx.payment_method === 'transferencia' ? 'Transferencia' : postCheckoutTx.payment_method === 'tarjeta_debito' ? 'Tarjeta Débito' : postCheckoutTx.payment_method === 'tarjeta_credito' ? 'Tarjeta Crédito' : 'MercadoPago'}</p>
+                    <p style="margin: 3px 0; font-size: 14px;"><strong>TOTAL:</strong> \${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postCheckoutTx.amount)}</p>
+                  </div>
+                  <div style="border-bottom: 1px dashed #000; margin: 15px 0;"></div>
+                  <div style="text-align: center; font-size: 10px;">
+                    <p style="margin: 5px 0">¡Gracias por su visita!</p>
+                    <p style="margin: 0">miturnovip.com</p>
+                  </div>
+                `
+                
+                // Add temporary style block for print formatting
+                const style = document.createElement('style')
+                style.innerHTML = `
+                  @media print {
+                    body > * {
+                      display: none !important;
+                    }
+                    #thermal-ticket-print-temp {
+                      display: block !important;
+                    }
+                  }
+                `
+                printDiv.id = 'thermal-ticket-print-temp'
+                document.body.appendChild(printDiv)
+                document.head.appendChild(style)
+                window.print()
+                document.body.removeChild(printDiv)
+                document.head.removeChild(style)
+              }}
+              className="inline-flex items-center gap-1.5 bg-primary text-white cursor-pointer"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Imprimir Ticket</span>
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

@@ -26,7 +26,9 @@ import {
   XCircle,
   RefreshCw,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Printer,
+  AlertCircle
 } from 'lucide-react'
 
 interface Customer {
@@ -165,14 +167,37 @@ export default function ClientesPage() {
     province: 'La Pampa'
   })
 
+  const [saleErrorMsg, setSaleErrorMsg] = useState('')
+
   // Product Sale Form (rendered in History tab)
   const [isAddingSale, setIsAddingSale] = useState(false)
   const [saleFormData, setSaleFormData] = useState({
     product_name: '',
     quantity: '1',
-    price: ''
+    price: '',
+    payment_method: 'efectivo'
   })
-  const [saleErrorMsg, setSaleErrorMsg] = useState('')
+
+  // Caja & Ticket states
+  const [isCajaOpen, setIsCajaOpen] = useState(false)
+  const [checkingCaja, setCheckingCaja] = useState(true)
+  const [currentUserName, setCurrentUserName] = useState<string>('')
+  const [isPostSaleTicketOpen, setIsPostSaleTicketOpen] = useState(false)
+  const [postSaleTx, setPostSaleTx] = useState<any>(null)
+  const [postSaleDetails, setPostSaleDetails] = useState<any>(null)
+
+  const checkCajaStatus = async () => {
+    setCheckingCaja(true)
+    try {
+      const res = await fetch('/api/tenant/caja/status')
+      const data = await res.json()
+      setIsCajaOpen(res.ok && data.isOpen)
+    } catch (e) {
+      setIsCajaOpen(false)
+    } finally {
+      setCheckingCaja(false)
+    }
+  }
 
   const supabase = createClient()
 
@@ -211,16 +236,17 @@ export default function ClientesPage() {
       if (customersErr) throw customersErr
       setCustomers(customersData || [])
 
-      // 3. Get User Role
+      // 3. Get User Role & Profile
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: profile } = await supabase
           .from('users')
-          .select('role')
+          .select('role, first_name, last_name')
           .eq('id', user.id)
           .single()
         if (profile) {
           setUserRole(profile.role)
+          setCurrentUserName(`${profile.first_name || ''} ${profile.last_name || ''}`.trim() || user.email?.split('@')[0] || '')
         }
       }
     } catch (err: any) {
@@ -278,10 +304,13 @@ export default function ClientesPage() {
     setSelectedCustomer(customer)
     setHistoryTab('services')
     setIsAddingSale(false)
-    setSaleFormData({ product_name: '', quantity: '1', price: '' })
+    setSaleFormData({ product_name: '', quantity: '1', price: '', payment_method: 'efectivo' })
     setSaleErrorMsg('')
     setIsFichaModalOpen(true)
-    await fetchCustomerHistory(customer.id)
+    await Promise.all([
+      checkCajaStatus(),
+      fetchCustomerHistory(customer.id)
+    ])
   }
 
   // Open Create Customer Modal
@@ -423,18 +452,66 @@ export default function ClientesPage() {
     }
 
     try {
-      const { error } = await supabase
+      // 1. Verify Caja is open
+      const statusRes = await fetch('/api/tenant/caja/status')
+      const statusData = await statusRes.json()
+      if (!statusRes.ok || !statusData.isOpen) {
+        throw new Error('La caja diaria está cerrada. Abre la caja antes de registrar cobros.')
+      }
+
+      // 2. Insert Sale and get ID
+      const { data: newSale, error } = await supabase
         .from('sales')
         .insert([payload])
+        .select()
+        .single()
 
       if (error) throw error
 
+      // 3. Register transaction in Daily Caja
+      const txRes = await fetch('/api/tenant/caja/transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'income',
+          amount: payload.price * payload.quantity,
+          payment_method: saleFormData.payment_method,
+          category: 'producto',
+          reference_id: newSale.id,
+          notes: `Venta de producto: ${payload.product_name} x ${payload.quantity} - Cliente: ${selectedCustomer.first_name} ${selectedCustomer.last_name}`
+        })
+      })
+      const txData = await txRes.json()
+      if (!txRes.ok) throw new Error(txData.error)
+
+      // 4. Store ticket details and display
+      setPostSaleTx({
+        id: txData.transaction.id,
+        created_at: txData.transaction.created_at,
+        amount: txData.transaction.amount,
+        payment_method: txData.transaction.payment_method,
+        category: txData.transaction.category,
+        user: { first_name: currentUserName }
+      })
+
+      const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('name')
+        .eq('id', tenantId)
+        .single()
+
+      setPostSaleDetails({
+        tenantName: tenantData?.name || 'Mi Turno VIP',
+        clientName: `${selectedCustomer.first_name} ${selectedCustomer.last_name}`,
+        serviceOrProduct: `${payload.product_name} x ${payload.quantity}`
+      })
+
       setIsAddingSale(false)
-      setSaleFormData({ product_name: '', quantity: '1', price: '' })
-      showNotification('Venta de producto registrada con éxito', 'success')
+      setSaleFormData({ product_name: '', quantity: '1', price: '', payment_method: 'efectivo' })
+      showNotification('Venta de producto registrada y cobrada con éxito', 'success')
       
-      // Refresh histories
-      fetchCustomerHistory(selectedCustomer.id)
+      setIsFichaModalOpen(false)
+      setIsPostSaleTicketOpen(true)
     } catch (err: any) {
       setSaleErrorMsg(err.message || 'Error al guardar la venta.')
     }
@@ -911,7 +988,21 @@ export default function ClientesPage() {
                 {historyTab === 'purchases' && (
                   <div className="space-y-4">
                     {/* Add purchase button toggler */}
-                    {!isAddingSale ? (
+                    {checkingCaja ? (
+                      <div className="p-4 text-center text-xs text-zinc-400 animate-pulse">
+                        Verificando estado de caja...
+                      </div>
+                    ) : !isCajaOpen ? (
+                      <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-950/30 rounded-xl text-rose-700 dark:text-rose-400 text-xs space-y-2">
+                        <div className="flex items-center gap-2 font-bold uppercase tracking-wide">
+                          <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                          <span>Caja Diaria Cerrada</span>
+                        </div>
+                        <p className="text-[11px] leading-relaxed">
+                          No es posible registrar ventas de productos porque la caja diaria del comercio se encuentra cerrada. Abre la sesión de caja en la sección de Caja para poder registrar cobros.
+                        </p>
+                      </div>
+                    ) : !isAddingSale ? (
                       <Button 
                         type="button" 
                         variant="outline" 
@@ -963,6 +1054,20 @@ export default function ClientesPage() {
                           />
                         </div>
 
+                        <Select
+                          label="Método de Pago"
+                          required
+                          value={saleFormData.payment_method}
+                          onChange={(e) => setSaleFormData({ ...saleFormData, payment_method: e.target.value })}
+                          options={[
+                            { label: 'Efectivo', value: 'efectivo' },
+                            { label: 'Transferencia Bancaria', value: 'transferencia' },
+                            { label: 'Tarjeta de Débito', value: 'tarjeta_debito' },
+                            { label: 'Tarjeta de Crédito', value: 'tarjeta_credito' },
+                            { label: 'MercadoPago', value: 'mercadopago' },
+                          ]}
+                        />
+
                         <div className="flex justify-end gap-2 pt-2">
                           <Button type="button" variant="outline" size="sm" onClick={() => setIsAddingSale(false)}>
                             Cancelar
@@ -1012,6 +1117,147 @@ export default function ClientesPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* MODAL: POST SALE TICKET PRINT PREVIEW */}
+      <Modal
+        isOpen={isPostSaleTicketOpen}
+        onClose={() => setIsPostSaleTicketOpen(false)}
+        title="Venta Registrada con Éxito - Generar Recibo"
+        size="md"
+      >
+        <div className="space-y-6">
+          {/* Thermal Ticket Monospace view */}
+          <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-inner max-w-sm mx-auto font-mono text-zinc-900 dark:text-zinc-100 relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-200 via-transparent to-transparent bg-repeat-x bg-[length:10px_4px]"></div>
+            
+            <div className="text-center space-y-1">
+              <h4 className="font-bold text-sm tracking-tight">{postSaleDetails?.tenantName.toUpperCase()}</h4>
+              <p className="text-[10px] text-zinc-450 dark:text-zinc-500">Ticket de Pago de Producto</p>
+              <p className="text-[9px] text-zinc-400 dark:text-zinc-500">
+                {postSaleTx && new Date(postSaleTx.created_at).toLocaleString()}
+              </p>
+            </div>
+            
+            <div className="border-t border-dashed border-zinc-300 dark:border-zinc-700 my-3"></div>
+            
+            <div className="text-[10px] text-zinc-700 dark:text-zinc-300 space-y-1">
+              <p><strong>Ticket ID:</strong> #{postSaleTx ? postSaleTx.id.slice(0, 8).toUpperCase() : ''}</p>
+              <p><strong>Operador:</strong> {postSaleTx?.user?.first_name || 'Personal'}</p>
+              <p><strong>Cliente:</strong> {postSaleDetails?.clientName}</p>
+            </div>
+            
+            <div className="border-t border-zinc-300 dark:border-zinc-700 my-3"></div>
+            
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between font-bold border-b border-zinc-200 dark:border-zinc-800 pb-1">
+                <span>Concepto</span>
+                <span>Total</span>
+              </div>
+              <div className="flex justify-between text-[11px]">
+                <span className="truncate max-w-[200px]">{postSaleDetails?.serviceOrProduct}</span>
+                <span className="font-semibold">{postSaleTx && new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postSaleTx.amount)}</span>
+              </div>
+            </div>
+            
+            <div className="border-t border-dashed border-zinc-300 dark:border-zinc-700 my-3"></div>
+            
+            <div className="text-[10px] text-zinc-700 dark:text-zinc-300 space-y-1 text-right">
+              <p>Método de Pago: {postSaleTx ? (postSaleTx.payment_method === 'efectivo' ? 'Efectivo' : postSaleTx.payment_method === 'transferencia' ? 'Transferencia' : postSaleTx.payment_method === 'tarjeta_debito' ? 'Tarjeta Débito' : postSaleTx.payment_method === 'tarjeta_credito' ? 'Tarjeta Crédito' : 'MercadoPago') : ''}</p>
+              <p className="font-bold text-sm">TOTAL: {postSaleTx && new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postSaleTx.amount)}</p>
+            </div>
+
+            <div className="border-t border-dashed border-zinc-300 dark:border-zinc-700 my-3"></div>
+
+            <div className="text-center text-[9px] text-zinc-450 dark:text-zinc-500 space-y-0.5">
+              <p>¡Gracias por su visita!</p>
+              <p>miturnovip.com</p>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex justify-center gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsPostSaleTicketOpen(false)}
+            >
+              Cerrar
+            </Button>
+            <Button
+              onClick={() => {
+                // Setup print-only ticket elements in window
+                const printDiv = document.createElement('div')
+                printDiv.id = 'thermal-ticket-print-temp'
+                printDiv.style.fontFamily = 'monospace'
+                printDiv.style.fontSize = '12px'
+                printDiv.style.padding = '10px'
+                printDiv.style.width = '80mm'
+                printDiv.innerHTML = `
+                  <div style="text-align: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold;">\${postSaleDetails?.tenantName.toUpperCase()}</h3>
+                    <p style="margin: 0; font-size: 10px;">Mi Turno VIP POS System</p>
+                    <p style="margin: 0; font-size: 10px;">Fecha: \${new Date(postSaleTx.created_at).toLocaleString()}</p>
+                  </div>
+                  <div style="border-bottom: 1px dashed #000; margin-bottom: 10px;"></div>
+                  <div style="font-size: 11px; margin-bottom: 10px;">
+                    <p style="margin: 3px 0"><strong>Ticket ID:</strong> #\${postSaleTx.id.slice(0, 8).toUpperCase()}</p>
+                    <p style="margin: 3px 0"><strong>Operador:</strong> \${postSaleTx.user?.first_name || 'Personal'}</p>
+                    <p style="margin: 3px 0"><strong>Cliente:</strong> \${postSaleDetails.clientName}</p>
+                  </div>
+                  <div style="border-bottom: 1px dashed #000; margin-bottom: 10px;"></div>
+                  <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                    <thead>
+                      <tr style="border-bottom: 1px solid #000;">
+                        <th style="text-align: left; padding-bottom: 5px;">Concepto</th>
+                        <th style="text-align: right; padding-bottom: 5px;">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style="padding-top: 5px;">\${postSaleDetails.serviceOrProduct}</td>
+                        <td style="text-align: right; padding-top: 5px; font-weight: bold;">
+                          \${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postSaleTx.amount)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div style="border-bottom: 1px dashed #000; margin: 15px 0 10px 0;"></div>
+                  <div style="font-size: 11px; text-align: right;">
+                    <p style="margin: 3px 0"><strong>Método:</strong> \${postSaleTx.payment_method === 'efectivo' ? 'Efectivo' : postSaleTx.payment_method === 'transferencia' ? 'Transferencia' : postSaleTx.payment_method === 'tarjeta_debito' ? 'Tarjeta Débito' : postSaleTx.payment_method === 'tarjeta_credito' ? 'Tarjeta Crédito' : 'MercadoPago'}</p>
+                    <p style="margin: 3px 0; font-size: 14px;"><strong>TOTAL:</strong> \${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(postSaleTx.amount)}</p>
+                  </div>
+                  <div style="border-bottom: 1px dashed #000; margin: 15px 0;"></div>
+                  <div style="text-align: center; font-size: 10px;">
+                    <p style="margin: 5px 0">¡Gracias por su visita!</p>
+                    <p style="margin: 0">miturnovip.com</p>
+                  </div>
+                `
+                
+                // Add temporary style block for print formatting
+                const style = document.createElement('style')
+                style.innerHTML = `
+                  @media print {
+                    body > * {
+                      display: none !important;
+                    }
+                    #thermal-ticket-print-temp {
+                      display: block !important;
+                    }
+                  }
+                `
+                document.body.appendChild(printDiv)
+                document.head.appendChild(style)
+                window.print()
+                document.body.removeChild(printDiv)
+                document.head.removeChild(style)
+              }}
+              className="inline-flex items-center gap-1.5 bg-primary text-white cursor-pointer"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Imprimir Ticket</span>
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

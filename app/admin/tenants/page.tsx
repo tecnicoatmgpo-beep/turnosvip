@@ -33,6 +33,7 @@ interface EnabledModules {
   marketing: boolean
   whatsapp: boolean
   clientes: boolean
+  caja: boolean
 }
 
 const DEFAULT_MODULES: EnabledModules = {
@@ -43,6 +44,7 @@ const DEFAULT_MODULES: EnabledModules = {
   marketing: false,
   whatsapp: false,
   clientes: true,
+  caja: false,
 }
 
 const PLAN_DEFAULTS: Record<string, EnabledModules> = {
@@ -54,6 +56,7 @@ const PLAN_DEFAULTS: Record<string, EnabledModules> = {
     marketing: false,
     whatsapp: false,
     clientes: true,
+    caja: false,
   },
   pro: {
     agenda: true,
@@ -63,6 +66,7 @@ const PLAN_DEFAULTS: Record<string, EnabledModules> = {
     marketing: false,
     whatsapp: false,
     clientes: true,
+    caja: true,
   },
   vip: {
     agenda: true,
@@ -72,6 +76,7 @@ const PLAN_DEFAULTS: Record<string, EnabledModules> = {
     marketing: true,
     whatsapp: true,
     clientes: true,
+    caja: true,
   }
 }
 
@@ -151,6 +156,7 @@ export default function TenantsPage() {
         marketing: existing.marketing ?? false,
         whatsapp: existing.whatsapp ?? false,
         clientes: existing.clientes ?? true,
+        caja: existing.caja ?? false,
       })
     } else {
       setModulesConfig(DEFAULT_MODULES)
@@ -912,6 +918,20 @@ export default function TenantsPage() {
                 <div>
                   <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Recordatorios WhatsApp</span>
                   <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Notificaciones automatizadas de turnos.</p>
+                </div>
+              </label>
+
+              {/* Caja */}
+              <label className="flex items-start gap-3 p-3 bg-white dark:bg-card-custom border border-border-custom rounded-xl cursor-pointer hover:border-zinc-350 dark:hover:border-zinc-700 transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-primary cursor-pointer"
+                  checked={modulesConfig.caja}
+                  onChange={(e) => setModulesConfig({ ...modulesConfig, caja: e.target.checked })}
+                />
+                <div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Caja Diaria (POS)</span>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Control de ingresos, egresos, arqueos y reportes financieros.</p>
                 </div>
               </label>
             </div>

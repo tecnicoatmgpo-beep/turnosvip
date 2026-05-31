@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { Calendar, Store, Users, LogOut, Menu, X, Scissors, User, UserCheck } from 'lucide-react'
+import { Calendar, Store, Users, LogOut, Menu, X, Scissors, User, UserCheck, Wallet } from 'lucide-react'
 
 export default function TenantDashboardLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
@@ -22,7 +22,8 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
     staff: true,
     statistics: true,
     marketing: false,
-    whatsapp: false
+    whatsapp: false,
+    caja: false
   })
 
   const tenantSlug = params.tenantSlug as string
@@ -96,6 +97,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const menuItems = [
     { name: 'Resumen', href: `/${tenantSlug}/dashboard`, icon: Store, moduleKey: 'statistics' },
     { name: 'Agenda / Turnos', href: `/${tenantSlug}/dashboard/agenda`, icon: Calendar, moduleKey: 'agenda' },
+    { name: 'Caja Diaria', href: `/${tenantSlug}/dashboard/caja`, icon: Wallet, moduleKey: 'caja' },
     { name: 'Clientes', href: `/${tenantSlug}/dashboard/clientes`, icon: UserCheck, moduleKey: 'clientes' },
     { name: 'Servicios', href: `/${tenantSlug}/dashboard/servicios`, icon: Scissors, moduleKey: 'servicios' },
     { name: 'Personal (Staff)', href: `/${tenantSlug}/dashboard/staff`, icon: Users, moduleKey: 'staff' },
@@ -107,7 +109,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
 
     // 2. Hide admin sections if user is staff
     if (rawRole === 'staff') {
-      return item.moduleKey === 'agenda' || item.moduleKey === 'clientes'
+      return item.moduleKey === 'agenda' || item.moduleKey === 'clientes' || item.moduleKey === 'caja'
     }
 
     return true
@@ -120,13 +122,14 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
     const pathParts = pathname.split('/').filter(Boolean)
     // pathParts: [tenantSlug, 'dashboard', 'agenda']
     if (pathParts.length >= 2 && pathParts[1] === 'dashboard') {
-      const subpath = pathParts[2] // undefined, 'agenda', 'servicios', 'staff'
+      const subpath = pathParts[2] // undefined, 'agenda', 'servicios', 'staff', 'caja'
       
       let currentKey = 'statistics'
       if (subpath === 'agenda') currentKey = 'agenda'
       else if (subpath === 'clientes') currentKey = 'clientes'
       else if (subpath === 'servicios') currentKey = 'servicios'
       else if (subpath === 'staff') currentKey = 'staff'
+      else if (subpath === 'caja') currentKey = 'caja'
 
       const isStaffForbidden = rawRole === 'staff' && (currentKey === 'statistics' || currentKey === 'servicios' || currentKey === 'staff')
 
@@ -135,7 +138,7 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
         const fallback = menuItems.find(item => {
           if (enabledModules[item.moduleKey] === false) return false
           if (rawRole === 'staff') {
-            return item.moduleKey === 'agenda' || item.moduleKey === 'clientes'
+            return item.moduleKey === 'agenda' || item.moduleKey === 'clientes' || item.moduleKey === 'caja'
           }
           return true
         })
