@@ -17,12 +17,21 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (callerError || !callerProfile || !callerProfile.tenant_id) {
+    if (callerError || !callerProfile) {
       return NextResponse.json({ error: 'Comercio no asociado o perfil no encontrado.' }, { status: 403 })
     }
 
     const body = await request.json()
-    const { customer_id, payment_method, items, notes } = body
+    const { customer_id, payment_method, items, notes, tenant_id } = body
+
+    let activeTenantId = callerProfile.tenant_id
+    if (!activeTenantId && callerProfile.role === 'superadmin') {
+      activeTenantId = tenant_id
+    }
+
+    if (!activeTenantId) {
+      return NextResponse.json({ error: 'Comercio no asociado o perfil no encontrado.' }, { status: 403 })
+    }
 
     if (!payment_method || !items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (método de pago e ítems de compra).' }, { status: 400 })
@@ -32,7 +41,7 @@ export async function POST(request: Request) {
     const { data: openRegister, error: registerErr } = await supabase
       .from('cash_registers')
       .select('id, status')
-      .eq('tenant_id', callerProfile.tenant_id)
+      .eq('tenant_id', activeTenantId)
       .eq('status', 'open')
       .maybeSingle()
 
@@ -66,7 +75,7 @@ export async function POST(request: Request) {
         .from('products')
         .select('id, name, stock, cost_price, sale_price, is_active')
         .eq('id', product_id)
-        .eq('tenant_id', callerProfile.tenant_id)
+        .eq('tenant_id', activeTenantId)
         .single()
 
       if (prodErr || !product || !product.is_active) {
@@ -99,7 +108,7 @@ export async function POST(request: Request) {
       const { data: saleData, error: saleErr } = await supabase
         .from('sales')
         .insert({
-          tenant_id: callerProfile.tenant_id,
+          tenant_id: activeTenantId,
           customer_id: customer_id || null, // null for walk-in client
           product_name: product.name,
           quantity,
@@ -111,7 +120,7 @@ export async function POST(request: Request) {
 
       if (saleErr) {
         console.error('Error inserting sale record:', saleErr.message)
-        return NextResponse.json({ error: `Error al registrar la venta del producto: ${saleErr.message}` }, { status: 500 })
+        return NextResponse.json({ error: `Error al registrar la venta del producto: ${saleErr.message}` }, { status: 550 })
       }
 
       createdSales.push(saleData)
@@ -124,14 +133,14 @@ export async function POST(request: Request) {
 
       if (updateErr) {
         console.error('Error updating stock:', updateErr.message)
-        return NextResponse.json({ error: `Error al actualizar el stock del producto: ${updateErr.message}` }, { status: 500 })
+        return NextResponse.json({ error: `Error al actualizar el stock del producto: ${updateErr.message}` }, { status: 550 })
       }
 
       // C. Log stock movement
       const { error: moveErr } = await supabase
         .from('stock_movements')
         .insert({
-          tenant_id: callerProfile.tenant_id,
+          tenant_id: activeTenantId,
           product_id: product.id,
           user_id: user.id,
           type: 'output',
@@ -150,7 +159,7 @@ export async function POST(request: Request) {
     const { data: transaction, error: txErr } = await supabase
       .from('cash_transactions')
       .insert({
-        tenant_id: callerProfile.tenant_id,
+        tenant_id: activeTenantId,
         register_id: openRegister.id,
         user_id: user.id,
         type: 'income',
@@ -165,7 +174,7 @@ export async function POST(request: Request) {
 
     if (txErr) {
       console.error('Error creating cash transaction:', txErr.message)
-      return NextResponse.json({ error: `Venta procesada pero falló el registro en caja: ${txErr.message}` }, { status: 500 })
+      return NextResponse.json({ error: `Venta procesada pero falló el registro en caja: ${txErr.message}` }, { status: 550 })
     }
 
     return NextResponse.json({

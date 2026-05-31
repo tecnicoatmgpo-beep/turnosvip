@@ -283,7 +283,7 @@ export default function CashRegisterPage() {
   const loadCajaData = async (tId: string) => {
     setLoadingActive(true)
     try {
-      const res = await fetch('/api/tenant/caja/status')
+      const res = await fetch(`/api/tenant/caja/status?tenant_id=${tId}`)
       const data = await res.json()
       if (res.ok && data.isOpen) {
         setActiveSession({
@@ -320,7 +320,8 @@ export default function CashRegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           opening_balance: Number(openingBalance),
-          notes: openingNotes || null
+          notes: openingNotes || null,
+          tenant_id: tenantId
         })
       })
       const data = await res.json()
@@ -351,7 +352,8 @@ export default function CashRegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           actual_closing_balance: Number(actualClosingBalance),
-          notes: closingNotes || null
+          notes: closingNotes || null,
+          tenant_id: tenantId
         })
       })
       const data = await res.json()
@@ -395,7 +397,8 @@ export default function CashRegisterPage() {
           amount: Number(txAmount),
           payment_method: txPaymentMethod,
           category: txCategory,
-          notes: txNotes || null
+          notes: txNotes || null,
+          tenant_id: tenantId
         })
       })
       const data = await res.json()

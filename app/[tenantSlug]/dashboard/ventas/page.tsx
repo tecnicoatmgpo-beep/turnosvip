@@ -111,7 +111,7 @@ export default function VentasMostradorPage() {
       setTenantData(tenant)
 
       // 2. Check Caja Diaria Status
-      const res = await fetch('/api/tenant/caja/status')
+      const res = await fetch(`/api/tenant/caja/status?tenant_id=${tenant.id}`)
       const statusData = await res.json()
       if (res.ok && statusData.isOpen) {
         setIsCajaOpen(true)
@@ -277,7 +277,8 @@ export default function VentasMostradorPage() {
             quantity: item.quantity,
             price: item.price
           })),
-          notes: notes.trim() || undefined
+          notes: notes.trim() || undefined,
+          tenant_id: tenantId
         })
       })
 

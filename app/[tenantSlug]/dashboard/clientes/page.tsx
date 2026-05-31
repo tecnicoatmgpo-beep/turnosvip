@@ -224,7 +224,7 @@ export default function ClientesPage() {
   const checkCajaStatus = async () => {
     setCheckingCaja(true)
     try {
-      const res = await fetch('/api/tenant/caja/status')
+      const res = await fetch(`/api/tenant/caja/status?tenant_id=${tenantId}`)
       const data = await res.json()
       setIsCajaOpen(res.ok && data.isOpen)
     } catch (e) {
@@ -521,7 +521,7 @@ export default function ClientesPage() {
 
     try {
       // 1. Verify Caja is open
-      const statusRes = await fetch('/api/tenant/caja/status')
+      const statusRes = await fetch(`/api/tenant/caja/status?tenant_id=${tenantId}`)
       const statusData = await statusRes.json()
       if (!statusRes.ok || !statusData.isOpen) {
         throw new Error('La caja diaria está cerrada. Abre la caja antes de registrar cobros.')
@@ -546,7 +546,8 @@ export default function ClientesPage() {
           payment_method: saleFormData.payment_method,
           category: 'producto',
           reference_id: newSale.id,
-          notes: `Venta de producto: ${payload.product_name} x ${payload.quantity} - Cliente: ${selectedCustomer.first_name} ${selectedCustomer.last_name}`
+          notes: `Venta de producto: ${payload.product_name} x ${payload.quantity} - Cliente: ${selectedCustomer.first_name} ${selectedCustomer.last_name}`,
+          tenant_id: tenantId
         })
       })
       const txData = await txRes.json()

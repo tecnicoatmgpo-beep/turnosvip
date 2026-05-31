@@ -18,13 +18,22 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (callerError || !callerProfile || !callerProfile.tenant_id) {
+    if (callerError || !callerProfile) {
       return NextResponse.json({ error: 'Comercio no asociado o perfil no encontrado.' }, { status: 403 })
     }
 
     // 3. Parse and validate body
     const body = await request.json()
-    const { type, amount, payment_method, category, notes, reference_id } = body
+    const { type, amount, payment_method, category, notes, reference_id, tenant_id } = body
+
+    let activeTenantId = callerProfile.tenant_id
+    if (!activeTenantId && callerProfile.role === 'superadmin') {
+      activeTenantId = tenant_id
+    }
+
+    if (!activeTenantId) {
+      return NextResponse.json({ error: 'Comercio no asociado o perfil no encontrado.' }, { status: 403 })
+    }
 
     if (!type || !amount || !payment_method || !category) {
       return NextResponse.json({ error: 'Faltan campos requeridos (tipo, monto, método de pago y categoría).' }, { status: 400 })
@@ -43,7 +52,7 @@ export async function POST(request: Request) {
     const { data: activeRegister, error: registerError } = await supabase
       .from('cash_registers')
       .select('id')
-      .eq('tenant_id', callerProfile.tenant_id)
+      .eq('tenant_id', activeTenantId)
       .eq('status', 'open')
       .maybeSingle()
 
@@ -55,7 +64,7 @@ export async function POST(request: Request) {
     const { data: newTx, error: txError } = await supabase
       .from('cash_transactions')
       .insert({
-        tenant_id: callerProfile.tenant_id,
+        tenant_id: activeTenantId,
         register_id: activeRegister.id,
         user_id: user.id,
         type,

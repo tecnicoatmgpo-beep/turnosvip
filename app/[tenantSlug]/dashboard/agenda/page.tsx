@@ -465,7 +465,7 @@ export default function AgendaPage() {
       setIsCheckoutModalOpen(true)
 
       try {
-        const res = await fetch('/api/tenant/caja/status')
+        const res = await fetch(`/api/tenant/caja/status?tenant_id=${tenantId}`)
         const data = await res.json()
         setIsCajaOpen(res.ok && data.isOpen)
       } catch (e) {
@@ -551,7 +551,7 @@ export default function AgendaPage() {
       // 1. Verify Cash Register is open if setting status to Completed
       let activeRegister: any = null
       if (payload.status === 'completed') {
-        const res = await fetch('/api/tenant/caja/status')
+        const res = await fetch(`/api/tenant/caja/status?tenant_id=${tenantId}`)
         const statusData = await res.json()
         if (!res.ok || !statusData.isOpen) {
           throw new Error('No se puede completar el turno: la caja diaria está cerrada. Por favor, abre la caja en la sección de Caja antes de registrar cobros.')
@@ -1750,7 +1750,7 @@ export default function AgendaPage() {
                   const { data: { user } } = await supabase.auth.getUser()
                   
                   // 1. Fetch active session register details
-                  const res = await fetch('/api/tenant/caja/status')
+                  const res = await fetch(`/api/tenant/caja/status?tenant_id=${tenantId}`)
                   const statusData = await res.json()
                   if (!res.ok || !statusData.isOpen) {
                     throw new Error('La caja se encuentra cerrada.')
@@ -1792,7 +1792,8 @@ export default function AgendaPage() {
                       payment_method: checkoutPaymentMethod,
                       category: 'servicio',
                       reference_id: checkoutAppointment.id,
-                      notes: `Cobro de turno - Cliente: ${checkoutAppointment.client_name}`
+                      notes: `Cobro de turno - Cliente: ${checkoutAppointment.client_name}`,
+                      tenant_id: tenantId
                     })
                   })
                   const txData = await txRes.json()
@@ -1849,7 +1850,8 @@ export default function AgendaPage() {
                         payment_method: checkoutPaymentMethod,
                         category: 'producto',
                         reference_id: checkoutAppointment.id,
-                        notes: `Producto vinculado a turno (${linkedProduct.name} x${prodQty}) - Cliente: ${checkoutAppointment.client_name}`
+                        notes: `Producto vinculado a turno (${linkedProduct.name} x${prodQty}) - Cliente: ${checkoutAppointment.client_name}`,
+                        tenant_id: tenantId
                       })
                     })
                     const pTxData = await pTxRes.json()

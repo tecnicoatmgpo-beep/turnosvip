@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     // 1. Verify caller session
     const supabase = await createClient()
@@ -18,7 +18,17 @@ export async function GET() {
       .eq('id', user.id)
       .single()
 
-    if (callerError || !callerProfile || !callerProfile.tenant_id) {
+    if (callerError || !callerProfile) {
+      return NextResponse.json({ error: 'Comercio no asociado o perfil no encontrado.' }, { status: 403 })
+    }
+
+    let activeTenantId = callerProfile.tenant_id
+    if (!activeTenantId && callerProfile.role === 'superadmin') {
+      const { searchParams } = new URL(request.url)
+      activeTenantId = searchParams.get('tenant_id')
+    }
+
+    if (!activeTenantId) {
       return NextResponse.json({ error: 'Comercio no asociado o perfil no encontrado.' }, { status: 403 })
     }
 
@@ -26,7 +36,7 @@ export async function GET() {
     const { data: activeRegister, error: registerError } = await supabase
       .from('cash_registers')
       .select('*, opened_by_user:users!cash_registers_opened_by_fkey(first_name, last_name, email)')
-      .eq('tenant_id', callerProfile.tenant_id)
+      .eq('tenant_id', activeTenantId)
       .eq('status', 'open')
       .maybeSingle()
 

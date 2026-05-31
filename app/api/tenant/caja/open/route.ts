@@ -18,13 +18,22 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (callerError || !callerProfile || !callerProfile.tenant_id) {
+    if (callerError || !callerProfile) {
       return NextResponse.json({ error: 'Comercio no asociado o perfil no encontrado.' }, { status: 403 })
     }
 
     // 3. Parse and validate body
     const body = await request.json()
-    const { opening_balance, notes } = body
+    const { opening_balance, notes, tenant_id } = body
+
+    let activeTenantId = callerProfile.tenant_id
+    if (!activeTenantId && callerProfile.role === 'superadmin') {
+      activeTenantId = tenant_id
+    }
+
+    if (!activeTenantId) {
+      return NextResponse.json({ error: 'Comercio no asociado o perfil no encontrado.' }, { status: 403 })
+    }
 
     if (opening_balance === undefined || Number(opening_balance) < 0) {
       return NextResponse.json({ error: 'El saldo inicial es requerido y debe ser mayor o igual a 0.' }, { status: 400 })
@@ -34,7 +43,7 @@ export async function POST(request: Request) {
     const { data: openRegister, error: checkError } = await supabase
       .from('cash_registers')
       .select('id')
-      .eq('tenant_id', callerProfile.tenant_id)
+      .eq('tenant_id', activeTenantId)
       .eq('status', 'open')
       .maybeSingle()
 
@@ -51,7 +60,7 @@ export async function POST(request: Request) {
     const { data: newRegister, error: openError } = await supabase
       .from('cash_registers')
       .insert({
-        tenant_id: callerProfile.tenant_id,
+        tenant_id: activeTenantId,
         opened_by: user.id,
         opening_balance: Number(opening_balance),
         status: 'open',
