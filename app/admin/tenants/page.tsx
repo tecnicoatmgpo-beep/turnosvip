@@ -427,9 +427,17 @@ export default function TenantsPage() {
         }
 
         // Update existing tenant (directly client-side)
+        const updatePayload: any = { ...payload }
+        if (payload.plan_id !== editingTenant.plan_id) {
+          const selectedPlan = plans.find(p => p.id === payload.plan_id)
+          const planSlug = selectedPlan?.slug || 'basico'
+          const defaultModules = PLAN_DEFAULTS[planSlug] || PLAN_DEFAULTS['basico']
+          updatePayload.enabled_modules = defaultModules
+        }
+
         const { error } = await supabase
           .from('tenants')
-          .update(payload)
+          .update(updatePayload)
           .eq('id', editingTenant.id)
 
         if (error) throw error

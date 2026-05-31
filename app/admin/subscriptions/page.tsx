@@ -30,9 +30,74 @@ interface Tenant {
   trial_ends_at: string | null
   current_period_end: string | null
   created_at: string
+  enabled_modules?: any
   subscription_plans?: {
     name: string
+    slug?: string
   } | null
+}
+
+const PLAN_DEFAULTS: Record<string, any> = {
+  essential: {
+    agenda: true,
+    servicios: true,
+    staff: true,
+    statistics: false,
+    marketing: false,
+    whatsapp: false,
+    clientes: true,
+    caja: false,
+    inventario: false,
+    ventas_mostrador: false,
+  },
+  basico: {
+    agenda: true,
+    servicios: true,
+    staff: true,
+    statistics: false,
+    marketing: false,
+    whatsapp: false,
+    clientes: true,
+    caja: false,
+    inventario: false,
+    ventas_mostrador: false,
+  },
+  pro: {
+    agenda: true,
+    servicios: true,
+    staff: true,
+    statistics: true,
+    marketing: false,
+    whatsapp: false,
+    clientes: true,
+    caja: true,
+    inventario: true,
+    ventas_mostrador: true,
+  },
+  vip: {
+    agenda: true,
+    servicios: true,
+    staff: true,
+    statistics: true,
+    marketing: true,
+    whatsapp: true,
+    clientes: true,
+    caja: true,
+    inventario: true,
+    ventas_mostrador: true,
+  },
+  premium: {
+    agenda: true,
+    servicios: true,
+    staff: true,
+    statistics: true,
+    marketing: true,
+    whatsapp: true,
+    clientes: true,
+    caja: true,
+    inventario: true,
+    ventas_mostrador: true,
+  }
 }
 
 export default function SubscriptionsPage() {
@@ -89,7 +154,7 @@ export default function SubscriptionsPage() {
       // Fetch tenants with plan details
       const { data: tenantsData, error: tenantsError } = await supabase
         .from('tenants')
-        .select('*, subscription_plans(name)')
+        .select('*, subscription_plans(name, slug)')
         .order('created_at', { ascending: false })
 
       if (tenantsError) throw tenantsError
@@ -277,11 +342,18 @@ export default function SubscriptionsPage() {
       }
     }
 
-    const payload = {
+    const payload: any = {
       plan_id: assignFormData.plan_id || null,
       subscription_status: assignFormData.subscription_status,
       trial_ends_at: assignFormData.trial_ends_at ? new Date(assignFormData.trial_ends_at).toISOString() : null,
       current_period_end: assignFormData.current_period_end ? new Date(assignFormData.current_period_end).toISOString() : null,
+    }
+
+    if (assignFormData.plan_id !== editingTenant.plan_id) {
+      const selectedPlan = plans.find(p => p.id === assignFormData.plan_id)
+      const planSlug = selectedPlan?.slug || 'basico'
+      const defaultModules = PLAN_DEFAULTS[planSlug] || PLAN_DEFAULTS['basico']
+      payload.enabled_modules = defaultModules
     }
 
     try {

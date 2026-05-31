@@ -43,6 +43,59 @@ export async function POST(request: Request) {
     // 3. Initialize admin client (bypasses RLS to insert tenant & create auth user)
     const adminSupabase = createAdminClient()
 
+    // 3.5. Determine default enabled modules for the chosen plan
+    let enabledModules = {
+      agenda: true,
+      servicios: true,
+      staff: true,
+      statistics: false,
+      marketing: false,
+      whatsapp: false,
+      clientes: true,
+      caja: false,
+      inventario: false,
+      ventas_mostrador: false,
+    }
+
+    if (plan_id) {
+      const { data: planData } = await adminSupabase
+        .from('subscription_plans')
+        .select('slug')
+        .eq('id', plan_id)
+        .single()
+
+      if (planData) {
+        const slug = planData.slug
+        if (slug === 'pro') {
+          enabledModules = {
+            agenda: true,
+            servicios: true,
+            staff: true,
+            statistics: true,
+            marketing: false,
+            whatsapp: false,
+            clientes: true,
+            caja: true,
+            inventario: true,
+            ventas_mostrador: true,
+          }
+        } else if (slug === 'premium' || slug === 'vip') {
+          enabledModules = {
+            agenda: true,
+            servicios: true,
+            staff: true,
+            statistics: true,
+            marketing: true,
+            whatsapp: true,
+            clientes: true,
+            caja: true,
+            inventario: true,
+            ventas_mostrador: true,
+          }
+        }
+      }
+    }
+
     // 4. Create the Tenant
     const { data: tenant, error: tenantError } = await adminSupabase
       .from('tenants')
@@ -55,6 +108,7 @@ export async function POST(request: Request) {
           subscription_status,
           trial_ends_at: trial_ends_at || null,
           current_period_end: current_period_end || null,
+          enabled_modules: enabledModules,
         }
       ])
       .select()

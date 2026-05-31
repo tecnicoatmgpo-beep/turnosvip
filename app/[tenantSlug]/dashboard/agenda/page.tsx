@@ -109,6 +109,7 @@ export default function AgendaPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<any[]>([])
   const [hasProductSupport, setHasProductSupport] = useState<boolean>(false)
+  const [maxAppointmentsLimit, setMaxAppointmentsLimit] = useState<number | null>(null)
 
   // Views & Filtering
   const [viewMode, setViewMode] = useState<ViewMode>('day')
@@ -160,15 +161,23 @@ export default function AgendaPage() {
     setLoading(true)
     setErrorMsg('')
     try {
-      // 1. Get Tenant ID from Slug
+      // 1. Get Tenant ID and subscription limits from Slug
       const { data: tenant, error: tenantErr } = await supabase
         .from('tenants')
-        .select('id')
+        .select(`
+          id,
+          plan_id,
+          subscription_plans (
+            max_appointments_per_month
+          )
+        `)
         .eq('slug', tenantSlug)
         .single()
 
       if (tenantErr || !tenant) throw new Error('Comercio no encontrado')
       setTenantId(tenant.id)
+      const limit = (tenant.subscription_plans as any)?.max_appointments_per_month
+      setMaxAppointmentsLimit(limit !== undefined ? limit : null)
 
       // 2. Fetch Services
       const { data: servicesData } = await supabase
@@ -561,6 +570,28 @@ export default function AgendaPage() {
         if (error) throw error
         showNotification('Turno actualizado con éxito', 'success')
       } else {
+        // Limit check
+        if (maxAppointmentsLimit !== null) {
+          const now = new Date()
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+          const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString()
+
+          const { count, error: countErr } = await supabase
+            .from('appointments')
+            .select('*', { count: 'exact', head: true })
+            .eq('tenant_id', tenantId)
+            .gte('created_at', startOfMonth)
+            .lte('created_at', endOfMonth)
+
+          if (countErr) {
+            throw new Error('Error al verificar el límite de turnos mensuales.')
+          }
+
+          if ((count || 0) >= maxAppointmentsLimit) {
+            throw new Error(`Límite de turnos mensuales alcanzado. Tu plan actual permite un máximo de ${maxAppointmentsLimit} reservas al mes.`)
+          }
+        }
+
         const { data: newAppt, error } = await supabase
           .from('appointments')
           .insert([payload])
