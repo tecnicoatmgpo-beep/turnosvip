@@ -137,7 +137,7 @@ export async function POST(request: Request) {
         staff_id,
         appointment_time: new Date(appointment_time).toISOString(),
         total_price: Number(service.price),
-        status: 'confirmed',
+        status: 'pending',
         notes: notes?.trim() || null,
         customer_id: customerId
       })

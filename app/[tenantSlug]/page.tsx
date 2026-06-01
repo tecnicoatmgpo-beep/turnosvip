@@ -682,47 +682,87 @@ export default function PublicBookingPage() {
         )}
 
         {/* STEP 5: BOOKING SUCCESS */}
-        {step === 5 && successAppt && tenant && (
-          <div className="p-8 bg-white dark:bg-card-custom border border-border-custom rounded-3xl shadow-xl text-center space-y-6 max-w-md mx-auto">
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900 text-emerald-600 dark:text-emerald-400 rounded-full w-fit mx-auto animate-bounce">
-              <CheckCircle2 className="w-10 h-10" />
-            </div>
+        {step === 5 && successAppt && tenant && (() => {
+          // Build WhatsApp message with booking details
+          const waDate = selectedDate.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+          const waMsg = encodeURIComponent(
+            `¡Hola ${tenant.name}! 👋 Acabo de reservar un turno online:\n\n` +
+            `📋 *Servicio:* ${selectedServiceDetails?.name || 'Servicio'}\n` +
+            `📅 *Fecha:* ${waDate}\n` +
+            `🕐 *Horario:* ${selectedTimeSlot} hs\n` +
+            `👤 *Nombre:* ${clientName}\n` +
+            `📞 *Teléfono:* ${clientPhone}\n` +
+            (notes ? `📝 *Nota:* ${notes}\n` : '') +
+            `\n¡Quedo a la espera de la confirmación! Muchas gracias 😊`
+          )
+          // Clean tenant phone: remove spaces, dashes, parentheses; add country code if needed
+          const rawPhone = (tenant.phone || '').replace(/[\s\-().+]/g, '')
+          const waPhone = rawPhone.startsWith('54') ? rawPhone : rawPhone ? `54${rawPhone}` : ''
+          const waUrl = waPhone ? `https://wa.me/${waPhone}?text=${waMsg}` : ''
 
-            <div className="space-y-2">
-              <h2 className="text-2xl font-black text-zinc-900 dark:text-zinc-50">¡Reserva Completada!</h2>
-              <p className="text-xs text-zinc-650 dark:text-zinc-400">
-                Tu turno para **{tenant.name}** ha sido reservado con éxito.
-              </p>
-            </div>
+          return (
+            <div className="p-8 bg-white dark:bg-card-custom border border-border-custom rounded-3xl shadow-xl text-center space-y-6 max-w-md mx-auto">
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900 text-emerald-600 dark:text-emerald-400 rounded-full w-fit mx-auto animate-bounce">
+                <CheckCircle2 className="w-10 h-10" />
+              </div>
 
-            {/* Thermal ticket style recap card */}
-            <div className="bg-zinc-50 dark:bg-zinc-900 border border-border-custom rounded-2xl p-5 text-xs space-y-3 font-mono text-left max-w-xs mx-auto">
-              <div className="text-center font-bold text-[11px] border-b border-dashed border-border-custom pb-2 uppercase tracking-wide">
-                Resumen de Turno
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black text-zinc-900 dark:text-zinc-50">¡Reserva Enviada!</h2>
+                <p className="text-xs text-zinc-650 dark:text-zinc-400">
+                  Tu solicitud de turno en <strong>{tenant.name}</strong> fue registrada y está <span className="text-amber-600 dark:text-amber-400 font-bold">pendiente de confirmación</span>.
+                </p>
               </div>
-              <div className="space-y-1">
-                <p><strong>Comercio:</strong> {tenant.name}</p>
-                <p><strong>Servicio:</strong> {selectedServiceDetails?.name}</p>
-                <p><strong>Precio:</strong> ${Number(selectedServiceDetails?.price).toLocaleString('es-AR')}</p>
-                <p><strong>Fecha:</strong> {selectedDate.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                <p><strong>Horario:</strong> {selectedTimeSlot} h</p>
-                {notes && <p><strong>Nota:</strong> "{notes}"</p>}
-              </div>
-              <div className="border-t border-dashed border-border-custom pt-2 mt-2 text-center text-[10px] text-zinc-400 font-sans">
-                Por favor, asiste 5 minutos antes.
-              </div>
-            </div>
 
-            <div className="flex flex-col gap-2 pt-4">
-              <Button 
-                onClick={() => router.push('/')} 
-                className="bg-primary hover:bg-primary-accent text-white font-extrabold text-xs py-3 w-full"
-              >
-                Volver al Inicio
-              </Button>
+              {/* Thermal ticket style recap card */}
+              <div className="bg-zinc-50 dark:bg-zinc-900 border border-border-custom rounded-2xl p-5 text-xs space-y-3 font-mono text-left max-w-xs mx-auto">
+                <div className="text-center font-bold text-[11px] border-b border-dashed border-border-custom pb-2 uppercase tracking-wide">
+                  Resumen de Turno
+                </div>
+                <div className="space-y-1">
+                  <p><strong>Comercio:</strong> {tenant.name}</p>
+                  <p><strong>Servicio:</strong> {selectedServiceDetails?.name}</p>
+                  <p><strong>Precio:</strong> ${Number(selectedServiceDetails?.price).toLocaleString('es-AR')}</p>
+                  <p><strong>Fecha:</strong> {selectedDate.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                  <p><strong>Horario:</strong> {selectedTimeSlot} h</p>
+                  {notes && <p><strong>Nota:</strong> "{notes}"</p>}
+                </div>
+                <div className="border-t border-dashed border-border-custom pt-2 mt-2 text-center text-[10px] text-amber-500 font-sans font-bold">
+                  ⏳ Pendiente de confirmación por el comercio
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 pt-2">
+                {/* WhatsApp CTA button */}
+                {waUrl ? (
+                  <a
+                    href={waUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2.5 w-full py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bc5a] active:bg-[#1da851] text-white font-extrabold text-sm transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                  >
+                    {/* WhatsApp SVG icon */}
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white shrink-0" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    </svg>
+                    Confirmar por WhatsApp
+                  </a>
+                ) : (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl text-xs text-amber-700 dark:text-amber-400 text-center">
+                    Contactá al comercio para confirmar tu turno.
+                  </div>
+                )}
+
+                <Button
+                  onClick={() => router.push('/')}
+                  className="bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-xs py-3 w-full border border-border-custom"
+                >
+                  Volver al Inicio
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
+
 
       </div>
     </div>
