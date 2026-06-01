@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { Calendar, Store, Users, LogOut, Menu, X, Scissors, User, UserCheck, Wallet, Package, Settings, ShoppingCart } from 'lucide-react'
+import { Calendar, Store, Users, LogOut, Menu, X, Scissors, User, UserCheck, Wallet, Package, Settings, ShoppingCart, CreditCard, AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react'
 
 export default function TenantDashboardLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
@@ -16,6 +16,12 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
   const [userRole, setUserRole] = useState<string | null>(null)
   const [rawRole, setRawRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [subscriptionBadge, setSubscriptionBadge] = useState<{
+    daysRemaining: number
+    planName: string
+    status: string
+    expirationDate: string | null
+  } | null>(null)
   const [enabledModules, setEnabledModules] = useState<Record<string, boolean>>({
     agenda: true,
     servicios: true,
@@ -66,10 +72,10 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
           }
         }
 
-        // Get tenant name and modules configuration
+        // Get tenant name, modules config, subscription info and plan
         const { data: tenant } = await supabase
           .from('tenants')
-          .select('name, enabled_modules')
+          .select('name, enabled_modules, status, trial_ends_at, current_period_end, subscription_plans(name)')
           .eq('slug', tenantSlug)
           .single()
         
@@ -78,6 +84,22 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
           if (tenant.enabled_modules && typeof tenant.enabled_modules === 'object') {
             setEnabledModules(tenant.enabled_modules as Record<string, boolean>)
           }
+          // Build subscription badge data
+          const expirationStr = (tenant.status === 'trial' ? tenant.trial_ends_at : tenant.current_period_end) as string | null
+          let daysRemaining = 0
+          if (expirationStr) {
+            const expDate = new Date(expirationStr)
+            expDate.setHours(0, 0, 0, 0)
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            daysRemaining = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+          }
+          setSubscriptionBadge({
+            daysRemaining,
+            planName: (tenant.subscription_plans as any)?.name || 'Sin plan',
+            status: tenant.status,
+            expirationDate: expirationStr
+          })
         }
       } catch (err) {
         console.error(err)
@@ -107,11 +129,12 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
     { name: 'Servicios', href: `/${tenantSlug}/dashboard/servicios`, icon: Scissors, moduleKey: 'servicios' },
     { name: 'Personal (Staff)', href: `/${tenantSlug}/dashboard/staff`, icon: Users, moduleKey: 'staff' },
     { name: 'Configuración', href: `/${tenantSlug}/dashboard/configuracion`, icon: Settings, moduleKey: 'configuracion' },
+    { name: 'Suscripción', href: `/${tenantSlug}/dashboard/suscripcion`, icon: CreditCard, moduleKey: 'suscripcion' },
   ]
 
   const filteredMenuItems = menuItems.filter(item => {
-    // 1. Check if module is disabled
-    if (enabledModules[item.moduleKey] === false) return false
+    // 1. suscripcion always visible for admin/superadmin; other modules respect enabled_modules
+    if (item.moduleKey !== 'suscripcion' && enabledModules[item.moduleKey] === false) return false
 
     // 2. Hide admin sections if user is staff
     if (rawRole === 'staff') {
@@ -139,10 +162,11 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
       else if (subpath === 'caja') currentKey = 'caja'
       else if (subpath === 'inventario') currentKey = 'inventario'
       else if (subpath === 'configuracion') currentKey = 'configuracion'
+      else if (subpath === 'suscripcion') currentKey = 'suscripcion'
 
-      const isStaffForbidden = rawRole === 'staff' && (currentKey === 'statistics' || currentKey === 'servicios' || currentKey === 'staff' || currentKey === 'configuracion')
+      const isStaffForbidden = rawRole === 'staff' && (currentKey === 'statistics' || currentKey === 'servicios' || currentKey === 'staff' || currentKey === 'configuracion' || currentKey === 'suscripcion')
 
-      if (enabledModules[currentKey] === false || isStaffForbidden) {
+      if ((currentKey !== 'suscripcion' && enabledModules[currentKey] === false) || isStaffForbidden) {
         // Find first enabled and allowed menu item to redirect to
         const fallback = menuItems.find(item => {
           if (enabledModules[item.moduleKey] === false) return false
@@ -216,8 +240,53 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
           </nav>
         </div>
 
-        {/* Bottom Profile / Logout */}
-        <div className="p-4 border-t border-border-custom space-y-2">
+        {/* Subscription Semáforo + Profile / Logout */}
+        <div className="p-4 border-t border-border-custom space-y-3">
+          {/* Subscription traffic-light widget – only visible to admin/superadmin */}
+          {subscriptionBadge && rawRole !== 'staff' && (() => {
+            const d = subscriptionBadge.daysRemaining
+            const isGreen = d >= 15
+            const isYellow = d >= 7 && d < 15
+            return (
+              <Link
+                href={`/${tenantSlug}/dashboard/suscripcion`}
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all hover:brightness-95 cursor-pointer ${
+                  isGreen
+                    ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40'
+                    : isYellow
+                    ? 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/40'
+                    : 'bg-rose-50 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/40 animate-pulse'
+                }`}
+              >
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                  isGreen
+                    ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]'
+                    : isYellow
+                    ? 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.7)] animate-pulse'
+                    : 'bg-rose-500 shadow-[0_0_6px_rgba(239,68,68,0.8)] animate-ping'
+                }`} />
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className={`text-[10px] font-bold uppercase tracking-wide truncate ${
+                    isGreen ? 'text-emerald-700 dark:text-emerald-400'
+                    : isYellow ? 'text-amber-700 dark:text-amber-400'
+                    : 'text-rose-700 dark:text-rose-400'
+                  }`}>{subscriptionBadge.planName}</span>
+                  <span className={`text-[9px] font-medium ${
+                    isGreen ? 'text-emerald-600/80 dark:text-emerald-500'
+                    : isYellow ? 'text-amber-600/80 dark:text-amber-500'
+                    : 'text-rose-600/80 dark:text-rose-500'
+                  }`}>
+                    {d > 0 ? `${d} día${d !== 1 ? 's' : ''} restante${d !== 1 ? 's' : ''}` : '¡Vencida!'}
+                  </span>
+                </div>
+                {isGreen && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
+                {isYellow && <Clock3 className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                {!isGreen && !isYellow && <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />}
+              </Link>
+            )
+          })()}
+
           <div className="flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-550 dark:text-zinc-400">
             <User className="w-4 h-4 shrink-0" />
             <div className="truncate flex flex-col">
