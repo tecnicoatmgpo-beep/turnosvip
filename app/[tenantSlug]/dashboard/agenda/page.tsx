@@ -316,17 +316,56 @@ export default function AgendaPage() {
     }
   }, [tenantSlug])
 
-  // Helpers
+  // Real-time subscription: auto-refresh agenda when appointments change
+  useEffect(() => {
+    if (!tenantId) return
+
+    const channel = supabase
+      .channel(`agenda-realtime-${tenantId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+          filter: `tenant_id=eq.${tenantId}`
+        },
+        () => {
+          // Reload agenda data whenever an appointment is inserted, updated, or deleted
+          loadData()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [tenantId])
+
+  // Argentina timezone constant
+  const TZ_ARGENTINA = 'America/Argentina/Buenos_Aires'
+
+  // Helper: format an ISO date string to YYYY-MM-DDTHH:mm in Argentina timezone
+  // for use in datetime-local inputs (avoids browser timezone shifting the display)
   const formatForDateTimeInput = (dateStr: string) => {
     if (!dateStr) return ''
     const date = new Date(dateStr)
-    const pad = (num: number) => num.toString().padStart(2, '0')
-    // Format to YYYY-MM-DDTHH:mm local time
-    const yyyy = date.getFullYear()
-    const mm = pad(date.getMonth() + 1)
-    const dd = pad(date.getDate())
-    const hh = pad(date.getHours())
-    const min = pad(date.getMinutes())
+    // Use Intl to extract parts in Argentina local time
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: TZ_ARGENTINA,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(date)
+    const get = (type: string) => parts.find(p => p.type === type)?.value ?? '00'
+    const yyyy = get('year')
+    const mm = get('month')
+    const dd = get('day')
+    const hh = get('hour') === '24' ? '00' : get('hour')
+    const min = get('minute')
     return `${yyyy}-${mm}-${dd}T${hh}:${min}`
   }
 
@@ -533,7 +572,10 @@ export default function AgendaPage() {
       client_email: formData.client_email.trim() || null,
       service_id: formData.service_id || null,
       staff_id: formData.staff_id || null,
-      appointment_time: new Date(formData.appointment_time).toISOString(),
+      // Parse datetime-local value as Argentina time (UTC-3) to avoid browser timezone shifts
+      appointment_time: formData.appointment_time
+        ? new Date(formData.appointment_time + ':00-03:00').toISOString()
+        : new Date().toISOString(),
       total_price: parseFloat(formData.total_price) || 0.00,
       notes: formData.notes.trim() || null,
       status: formData.status,
@@ -746,10 +788,13 @@ export default function AgendaPage() {
     setSelectedDate(newDate)
   }
 
+  // Compare two dates by calendar day in Argentina timezone (avoids UTC midnight edge cases)
   const isSameDay = (d1: Date, d2: Date) => {
-    return d1.getFullYear() === d2.getFullYear() &&
-           d1.getMonth() === d2.getMonth() &&
-           d1.getDate() === d2.getDate()
+    const fmt = (d: Date) => new Intl.DateTimeFormat('en-CA', {
+      timeZone: TZ_ARGENTINA,
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(d)
+    return fmt(d1) === fmt(d2)
   }
 
   // Filter Appointments based on parameters

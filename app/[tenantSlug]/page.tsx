@@ -140,13 +140,22 @@ export default function PublicBookingPage() {
 
   const timeSlots = getTimeSlots()
 
+  // Helper: build a Date from selected date + time string in Argentina timezone (UTC-3)
+  const buildArgentinaDate = (date: Date, timeStr: string): Date => {
+    const [hour, minute] = timeStr.split(':').map(Number)
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    const yr = date.getFullYear()
+    const mo = pad(date.getMonth() + 1)
+    const dy = pad(date.getDate())
+    // Explicitly create ISO string with -03:00 offset so Date parses it as UTC correctly
+    return new Date(`${yr}-${mo}-${dy}T${pad(hour)}:${pad(minute)}:00-03:00`)
+  }
+
   // Check if a time slot is busy (overlapping with existing appointments)
   const isSlotBusy = (timeStr: string) => {
     if (!selectedService) return true
     
-    const [hour, minute] = timeStr.split(':').map(Number)
-    const proposedTime = new Date(selectedDate)
-    proposedTime.setHours(hour, minute, 0, 0)
+    const proposedTime = buildArgentinaDate(selectedDate, timeStr)
 
     const selectedServiceObj = services.find(s => s.id === selectedService)
     const proposedDuration = selectedServiceObj ? selectedServiceObj.duration_minutes : 30
@@ -199,9 +208,7 @@ export default function PublicBookingPage() {
   const findAvailableStaffId = () => {
     if (selectedStaff !== 'any') return selectedStaff
 
-    const [hour, minute] = selectedTimeSlot.split(':').map(Number)
-    const proposedTime = new Date(selectedDate)
-    proposedTime.setHours(hour, minute, 0, 0)
+    const proposedTime = buildArgentinaDate(selectedDate, selectedTimeSlot)
 
     const selectedServiceObj = services.find(s => s.id === selectedService)
     const proposedDuration = selectedServiceObj ? selectedServiceObj.duration_minutes : 30
@@ -229,9 +236,8 @@ export default function PublicBookingPage() {
     setSubmitting(true)
     setErrorMsg('')
 
-    const [hour, minute] = selectedTimeSlot.split(':').map(Number)
-    const appointmentTime = new Date(selectedDate)
-    appointmentTime.setHours(hour, minute, 0, 0)
+    // Build appointment time with Argentina (UTC-3) offset via shared helper
+    const appointmentTimeISO = buildArgentinaDate(selectedDate, selectedTimeSlot).toISOString()
 
     const assignedStaffId = findAvailableStaffId()
 
@@ -246,7 +252,7 @@ export default function PublicBookingPage() {
           client_email: clientEmail || null,
           service_id: selectedService,
           staff_id: assignedStaffId,
-          appointment_time: appointmentTime.toISOString(),
+          appointment_time: appointmentTimeISO,
           notes: notes || null
         })
       })

@@ -80,20 +80,66 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Servicio no encontrado en el catálogo de este comercio.' }, { status: 404 })
     }
 
-    // 3. Create appointment
+    // 3. Find or create customer profile by phone number
+    let customerId: string | null = null
+    const trimmedPhone = client_phone.trim()
+    const trimmedName = client_name.trim()
+
+    try {
+      // Try to find existing customer by phone within this tenant
+      const { data: existingCustomer } = await adminSupabase
+        .from('customers')
+        .select('id')
+        .eq('tenant_id', tenant_id)
+        .eq('phone', trimmedPhone)
+        .maybeSingle()
+
+      if (existingCustomer) {
+        customerId = existingCustomer.id
+      } else {
+        // Create a new customer profile by splitting the full name
+        const nameParts = trimmedName.split(' ')
+        const firstName = nameParts[0] || trimmedName
+        const lastName = nameParts.slice(1).join(' ') || '-'
+
+        const { data: newCustomer, error: customerErr } = await adminSupabase
+          .from('customers')
+          .insert({
+            tenant_id,
+            first_name: firstName,
+            last_name: lastName,
+            phone: trimmedPhone,
+            email: client_email?.trim() || null,
+            category: 'nuevo'
+          })
+          .select('id')
+          .single()
+
+        if (!customerErr && newCustomer) {
+          customerId = newCustomer.id
+        }
+        // If customer creation fails, we still proceed with the appointment (non-blocking)
+      }
+    } catch (customerLinkErr) {
+      // Customer linking is non-blocking – log but do not fail the appointment
+      console.warn('Could not link/create customer profile:', customerLinkErr)
+    }
+
+    // 4. Create appointment (appointment_time is already a valid ISO string with correct offset)
     const { data: appointment, error: apptErr } = await adminSupabase
       .from('appointments')
       .insert({
         tenant_id,
-        client_name: client_name.trim(),
-        client_phone: client_phone.trim(),
+        client_name: trimmedName,
+        client_phone: trimmedPhone,
         client_email: client_email?.trim() || null,
         service_id,
         staff_id,
         appointment_time: new Date(appointment_time).toISOString(),
         total_price: Number(service.price),
         status: 'confirmed',
-        notes: notes?.trim() || null
+        notes: notes?.trim() || null,
+        customer_id: customerId
       })
       .select()
       .single()
