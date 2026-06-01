@@ -96,9 +96,6 @@ const getFeatureIcon = (feature: string) => {
   return CheckCircle2
 }
 
-// Superadmin WhatsApp number (update if needed)
-const SUPERADMIN_WA = '5492954624125'
-
 export default function SuscripcionPage() {
   const params = useParams()
   const tenantSlug = params.tenantSlug as string
@@ -106,12 +103,28 @@ export default function SuscripcionPage() {
   const [plans, setPlans] = useState<Plan[]>([])
   const [tenantSub, setTenantSub] = useState<TenantSub | null>(null)
   const [tenantName, setTenantName] = useState('')
+  const [superadminPhone, setSuperadminPhone] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
       const supabase = createClient()
+
+      // Fetch superadmin phone number dynamically
+      const { data: superadmin } = await supabase
+        .from('users')
+        .select('phone')
+        .eq('role', 'superadmin')
+        .not('phone', 'is', null)
+        .limit(1)
+        .maybeSingle()
+
+      if (superadmin?.phone) {
+        // Normalize: strip non-digits, ensure country code 54 prefix
+        const raw = superadmin.phone.replace(/[\s\-().+]/g, '')
+        setSuperadminPhone(raw.startsWith('54') ? raw : `54${raw}`)
+      }
 
       // Fetch all plans
       const { data: plansData } = await supabase
@@ -162,7 +175,8 @@ export default function SuscripcionPage() {
     const msg = encodeURIComponent(
       `¡Hola! Soy el administrador de *${tenantName}* y quiero solicitar información para actualizar mi plan a *${planName}*.\n\nActualmente estoy en el plan: ${tenantSub?.planName || 'Sin plan'}\n\n¡Muchas gracias!`
     )
-    return `https://wa.me/${SUPERADMIN_WA}?text=${msg}`
+    if (!superadminPhone) return '#'
+    return `https://wa.me/${superadminPhone}?text=${msg}`
   }
 
   // Status semáforo
