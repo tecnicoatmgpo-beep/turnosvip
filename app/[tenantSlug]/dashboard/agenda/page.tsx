@@ -87,7 +87,7 @@ interface Appointment {
   } | null
 }
 
-type ViewMode = 'day' | 'week' | 'list'
+type ViewMode = 'day' | 'week' | 'month' | 'list'
 
 
 export default function AgendaPage() {
@@ -784,8 +784,28 @@ export default function AgendaPage() {
       newDate.setDate(newDate.getDate() + amount)
     } else if (viewMode === 'week') {
       newDate.setDate(newDate.getDate() + amount * 7)
+    } else if (viewMode === 'month') {
+      newDate.setMonth(newDate.getMonth() + amount)
     }
     setSelectedDate(newDate)
+  }
+
+  // Build the 6-week grid for month view (Mon–Sun layout)
+  const getMonthCalendarDays = () => {
+    const year = selectedDate.getFullYear()
+    const month = selectedDate.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const dow = firstDay.getDay() // 0=Sun
+    const daysBack = dow === 0 ? 6 : dow - 1
+    const start = new Date(firstDay)
+    start.setDate(start.getDate() - daysBack)
+    const days: Date[] = []
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start)
+      d.setDate(start.getDate() + i)
+      days.push(d)
+    }
+    return days
   }
 
   // Compare two dates by calendar day in Argentina timezone (avoids UTC midnight edge cases)
@@ -935,9 +955,11 @@ export default function AgendaPage() {
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-50 min-w-[150px] text-center capitalize">
-                {viewMode === 'day' 
+                {viewMode === 'day'
                   ? selectedDate.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-                  : `Semana del ${weekDates[0].toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })} al ${weekDates[6].toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                  : viewMode === 'week'
+                    ? `Semana del ${weekDates[0].toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })} al ${weekDates[6].toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                    : selectedDate.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
                 }
               </span>
               <button
@@ -977,12 +999,22 @@ export default function AgendaPage() {
             <button
               onClick={() => setViewMode('week')}
               className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                viewMode === 'week' 
-                  ? 'bg-white dark:bg-card-custom text-primary shadow-xs font-bold' 
+                viewMode === 'week'
+                  ? 'bg-white dark:bg-card-custom text-primary shadow-xs font-bold'
                   : 'text-zinc-500 hover:text-zinc-850 dark:text-zinc-400 dark:hover:text-zinc-200'
               }`}
             >
               Semana
+            </button>
+            <button
+              onClick={() => setViewMode('month')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                viewMode === 'month'
+                  ? 'bg-white dark:bg-card-custom text-primary shadow-xs font-bold'
+                  : 'text-zinc-500 hover:text-zinc-850 dark:text-zinc-400 dark:hover:text-zinc-200'
+              }`}
+            >
+              Mes
             </button>
             <button
               onClick={() => setViewMode('list')}
@@ -1215,6 +1247,111 @@ export default function AgendaPage() {
               })}
             </div>
           )}
+
+          {/* Month View (Calendar Grid) */}
+          {viewMode === 'month' && (() => {
+            const monthDays = getMonthCalendarDays()
+            const currentMonth = selectedDate.getMonth()
+            const weekLabels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+
+            return (
+              <div className="bg-white dark:bg-card-custom border border-border-custom rounded-2xl shadow-xs overflow-hidden">
+                {/* Day-of-week header */}
+                <div className="grid grid-cols-7 border-b border-border-custom bg-zinc-50/50 dark:bg-zinc-900/40">
+                  {weekLabels.map(label => (
+                    <div key={label} className="py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                      {label}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar grid: 6 rows × 7 cols */}
+                <div className="grid grid-cols-7">
+                  {monthDays.map((date, idx) => {
+                    const isCurrentMonth = date.getMonth() === currentMonth
+                    const isToday = isSameDay(date, new Date())
+                    const dayAppts = appointments.filter(a => {
+                      if (!isSameDay(new Date(a.appointment_time), date)) return false
+                      if (filterStaff !== 'all' && a.staff_id !== filterStaff) return false
+                      if (filterStatus !== 'all' && a.status !== filterStatus) return false
+                      if (searchQuery) {
+                        const q = searchQuery.toLowerCase()
+                        return a.client_name.toLowerCase().includes(q) || (a.client_phone || '').includes(q)
+                      }
+                      return true
+                    })
+
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => { setSelectedDate(date); setViewMode('day') }}
+                        className={`min-h-[90px] p-1.5 border-b border-r border-border-custom/40 cursor-pointer transition-colors group
+                          ${!isCurrentMonth ? 'bg-zinc-50/60 dark:bg-zinc-900/20' : 'hover:bg-primary-light/5 dark:hover:bg-primary/5'}
+                          ${isToday ? 'bg-primary-light/10 dark:bg-primary/5 ring-1 ring-inset ring-primary/20' : ''}
+                        `}
+                      >
+                        {/* Day number */}
+                        <div className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full mx-auto
+                          ${isToday
+                            ? 'bg-primary text-white'
+                            : isCurrentMonth
+                              ? 'text-zinc-900 dark:text-zinc-100 group-hover:text-primary'
+                              : 'text-zinc-300 dark:text-zinc-600'
+                          }`}
+                        >
+                          {date.getDate()}
+                        </div>
+
+                        {/* Appointment pills */}
+                        <div className="space-y-0.5">
+                          {dayAppts.slice(0, 3).map(appt => (
+                            <div
+                              key={appt.id}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedAppointment(appt)
+                                setIsDetailModalOpen(true)
+                              }}
+                              title={`${new Date(appt.appointment_time).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} · ${appt.client_name} · ${appt.services?.name || ''}`}
+                              className={`text-[9px] font-semibold px-1 py-0.5 rounded truncate hover:opacity-80 transition-opacity
+                                ${appt.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400' :
+                                  appt.status === 'pending'   ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400' :
+                                  appt.status === 'completed' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-400' :
+                                                                'bg-rose-100 text-rose-500 dark:bg-rose-950/40 dark:text-rose-400 line-through opacity-60'
+                                }`}
+                            >
+                              {new Date(appt.appointment_time).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} {appt.client_name.split(' ')[0]}
+                            </div>
+                          ))}
+                          {dayAppts.length > 3 && (
+                            <div className="text-[9px] text-primary dark:text-primary-hover font-bold px-1">
+                              +{dayAppts.length - 3} más
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Month summary legend */}
+                <div className="flex items-center justify-between px-4 py-3 border-t border-border-custom bg-zinc-50/30 dark:bg-zinc-900/20 flex-wrap gap-2">
+                  <div className="flex items-center gap-3 text-[10px] font-semibold">
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-200 dark:bg-emerald-950/60 inline-block" /> Confirmado</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-200 dark:bg-amber-950/60 inline-block" /> Pendiente</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-indigo-200 dark:bg-indigo-950/60 inline-block" /> Completado</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-rose-200 dark:bg-rose-950/60 inline-block" /> Cancelado</span>
+                  </div>
+                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                    {appointments.filter(a => {
+                      const d = new Date(a.appointment_time)
+                      return d.getMonth() === currentMonth && d.getFullYear() === selectedDate.getFullYear()
+                    }).length} turnos este mes
+                  </span>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* List View (Table) */}
           {viewMode === 'list' && (
