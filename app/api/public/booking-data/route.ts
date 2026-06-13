@@ -23,6 +23,8 @@ export async function GET(request: Request) {
         address,
         phone,
         email,
+        business_hours,
+        blocked_dates,
         plan_id,
         subscription_plans (
           max_appointments_per_month
@@ -123,7 +125,9 @@ export async function GET(request: Request) {
         slug: tenant.slug,
         address: tenant.address,
         phone: tenant.phone,
-        email: tenant.email
+        email: tenant.email,
+        business_hours: (tenant as any).business_hours || null,
+        blocked_dates: (tenant as any).blocked_dates || []
       },
       services: services || [],
       staff: staff || [],

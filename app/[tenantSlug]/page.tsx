@@ -42,6 +42,14 @@ interface BusySlot {
   duration_minutes: number
 }
 
+interface DaySchedule {
+  day: number    // 0=Sunday … 6=Saturday
+  label: string
+  open: boolean
+  start: string  // "HH:MM"
+  end: string    // "HH:MM"
+}
+
 interface Tenant {
   id: string
   name: string
@@ -49,6 +57,8 @@ interface Tenant {
   address: string | null
   phone: string | null
   email: string | null
+  business_hours: DaySchedule[] | null
+  blocked_dates: string[]  // "YYYY-MM-DD"
 }
 
 export default function PublicBookingPage() {
@@ -112,13 +122,29 @@ export default function PublicBookingPage() {
     }
   }, [tenantSlug])
 
-  // Get Dates for the next 14 days starting today
+  // Get next 30 days, excluding closed weekdays and blocked dates
   const getBookingDates = () => {
     const dates = []
     const today = new Date()
-    for (let i = 0; i < 14; i++) {
+    const hours = tenant?.business_hours
+    const blocked = new Set((tenant?.blocked_dates || []).map((b: any) =>
+      typeof b === 'string' ? b : b.date
+    ))
+
+    for (let i = 0; i < 30 && dates.length < 14; i++) {
       const d = new Date(today)
       d.setDate(today.getDate() + i)
+
+      // Skip blocked specific dates
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      if (blocked.has(iso)) continue
+
+      // Skip days where business is closed
+      if (hours && Array.isArray(hours)) {
+        const dayConfig = hours.find((h: DaySchedule) => h.day === d.getDay())
+        if (dayConfig && !dayConfig.open) continue
+      }
+
       dates.push(d)
     }
     return dates
@@ -126,14 +152,33 @@ export default function PublicBookingPage() {
 
   const bookingDates = getBookingDates()
 
-  // Generate hourly time slots (e.g. 08:00 to 20:00 every 30 mins)
+  // Generate time slots for the selected day based on configured business hours
   const getTimeSlots = () => {
-    const slots = []
-    const startHour = 8
-    const endHour = 20
-    for (let h = startHour; h < endHour; h++) {
-      slots.push(`${h.toString().padStart(2, '0')}:00`)
-      slots.push(`${h.toString().padStart(2, '0')}:30`)
+    const slots: string[] = []
+    const hours = tenant?.business_hours
+
+    let startHour = 8
+    let startMin = 0
+    let endHour = 20
+    let endMin = 0
+
+    if (hours && Array.isArray(hours)) {
+      const dayConfig = hours.find((h: DaySchedule) => h.day === selectedDate.getDay())
+      if (dayConfig && dayConfig.open) {
+        const [sh, sm] = dayConfig.start.split(':').map(Number)
+        const [eh, em] = dayConfig.end.split(':').map(Number)
+        startHour = sh; startMin = sm
+        endHour = eh; endMin = em
+      }
+    }
+
+    for (let h = startHour; h <= endHour; h++) {
+      for (const m of [0, 30]) {
+        if (h === startHour && m < startMin) continue
+        if (h === endHour && m >= endMin) continue
+        if (h === endHour && endMin === 0) continue
+        slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`)
+      }
     }
     return slots
   }
