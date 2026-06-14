@@ -7,7 +7,7 @@ import { createClient } from '@/utils/supabase/client'
 import {
   Calendar, Store, Users, LogOut, Menu, X, Scissors, User, UserCheck,
   Wallet, Package, Settings, ShoppingCart, CreditCard, AlertTriangle,
-  CheckCircle2, Clock3, Bell
+  CheckCircle2, Clock3, Bell, Percent, FileDown
 } from 'lucide-react'
 
 export default function TenantDashboardLayout({ children }: { children: React.ReactNode }) {
@@ -119,6 +119,8 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
     { name: 'Clientes',         href: `/${tenantSlug}/dashboard/clientes`,           icon: UserCheck,   moduleKey: 'clientes'         },
     { name: 'Servicios',        href: `/${tenantSlug}/dashboard/servicios`,          icon: Scissors,    moduleKey: 'servicios'        },
     { name: 'Personal (Staff)', href: `/${tenantSlug}/dashboard/staff`,              icon: Users,       moduleKey: 'staff'            },
+    { name: 'Comisiones',       href: `/${tenantSlug}/dashboard/comisiones`,         icon: Percent,     moduleKey: 'staff'            },
+    { name: 'Reportes',         href: `/${tenantSlug}/dashboard/reportes`,           icon: FileDown,    moduleKey: 'statistics'       },
     { name: 'Recordatorios WA', href: `/${tenantSlug}/dashboard/recordatorios`,      icon: Bell,        moduleKey: 'whatsapp'         },
     { name: 'Configuración',    href: `/${tenantSlug}/dashboard/configuracion`,      icon: Settings,    moduleKey: 'configuracion'    },
     { name: 'Suscripción',      href: `/${tenantSlug}/dashboard/suscripcion`,        icon: CreditCard,  moduleKey: 'suscripcion'      },
@@ -145,6 +147,8 @@ export default function TenantDashboardLayout({ children }: { children: React.Re
       else if (subpath === 'staff')    currentKey = 'staff'
       else if (subpath === 'caja')     currentKey = 'caja'
       else if (subpath === 'inventario')    currentKey = 'inventario'
+      else if (subpath === 'comisiones')    currentKey = 'staff'
+      else if (subpath === 'reportes')      currentKey = 'statistics'
       else if (subpath === 'recordatorios') currentKey = 'whatsapp'
       else if (subpath === 'configuracion') currentKey = 'configuracion'
       else if (subpath === 'suscripcion')   currentKey = 'suscripcion'
