@@ -227,9 +227,16 @@ export default function ReportesPage() {
       {/* Print styles */}
       <style>{`
         @media print {
-          body > * { display: none !important; }
-          #print-area { display: block !important; }
-          #print-area * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          * { visibility: hidden; }
+          #print-area, #print-area * { visibility: visible; }
+          #print-area {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            padding: 24px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
         }
       `}</style>
 
