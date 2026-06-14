@@ -1,12 +1,32 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import {
   Calendar, Scissors, Sparkles, DollarSign,
   Clock, TrendingUp, BarChart2
 } from 'lucide-react'
+import EmptyState from '@/components/EmptyState'
+
+// ─── Animated counter hook ────────────────────────────────────────────────────
+function useAnimatedNumber(target: number, duration = 900) {
+  const [value, setValue] = useState(0)
+  const rafRef = useRef<number>(0)
+  useEffect(() => {
+    if (target === 0) { setValue(0); return }
+    const start = performance.now()
+    const tick = (now: number) => {
+      const p = Math.min((now - start) / duration, 1)
+      const eased = 1 - Math.pow(1 - p, 3)
+      setValue(Math.round(eased * target))
+      if (p < 1) rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [target, duration])
+  return value
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -359,23 +379,54 @@ export default function TenantDashboard() {
     },
   ]
 
-  const colorMap: Record<string, { card: string; icon: string }> = {
+  const colorMap: Record<string, { bar: string; icon: string; glow: string }> = {
     emerald: {
-      card: 'border-emerald-200/60 dark:border-emerald-900/30 hover:border-emerald-300 dark:hover:border-emerald-700/50',
-      icon: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400',
+      bar:  'bg-emerald-500',
+      icon: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400',
+      glow: 'text-emerald-600 dark:text-emerald-400',
     },
     amber: {
-      card: 'border-amber-200/60 dark:border-amber-900/30 hover:border-amber-300 dark:hover:border-amber-700/50',
-      icon: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400',
+      bar:  'bg-amber-500',
+      icon: 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400',
+      glow: 'text-amber-600 dark:text-amber-400',
     },
     indigo: {
-      card: 'border-indigo-200/60 dark:border-indigo-900/30 hover:border-indigo-300 dark:hover:border-indigo-700/50',
-      icon: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-400',
+      bar:  'bg-indigo-500',
+      icon: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400',
+      glow: 'text-indigo-600 dark:text-indigo-400',
     },
     rose: {
-      card: 'border-rose-200/60 dark:border-rose-900/30 hover:border-rose-300 dark:hover:border-rose-700/50',
-      icon: 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400',
+      bar:  'bg-rose-500',
+      icon: 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400',
+      glow: 'text-rose-600 dark:text-rose-400',
     },
+  }
+
+  // ── Animated KPI card sub-component
+  function AnimatedKpiCard({ card }: { card: typeof kpiCards[number] }) {
+    const animated = useAnimatedNumber(card.value)
+    const Icon = card.icon
+    const c = colorMap[card.color]
+    const displayValue = card.format
+      ? `$${animated.toLocaleString('es-AR')}`
+      : animated
+    return (
+      <div className="animate-fade-in-up relative bg-white dark:bg-card-custom border border-border-custom rounded-2xl overflow-hidden shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+        <div className={`absolute left-0 top-0 bottom-0 w-1 ${c.bar}`} />
+        <div className="pl-5 pr-5 pt-5 pb-5">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">{card.name}</span>
+            <div className={`p-2 rounded-xl ${c.icon}`}>
+              <Icon className="w-4 h-4" />
+            </div>
+          </div>
+          <span className={`text-3xl font-extrabold tracking-tight ${c.glow}`}>
+            {displayValue}
+          </span>
+          <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">{card.desc}</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -430,32 +481,10 @@ export default function TenantDashboard() {
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {kpiCards.map(card => {
-            const Icon = card.icon
-            const c = colorMap[card.color]
-            return (
-              <div
-                key={card.name}
-                className={`bg-white dark:bg-card-custom border ${c.card} rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:shadow-md hover:-translate-y-0.5 transition-all duration-200`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-zinc-450 dark:text-zinc-505 uppercase tracking-wider">{card.name}</span>
-                  <div className={`p-2 rounded-xl ${c.icon}`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <span className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight">
-                    {card.format
-                      ? `$${Number(card.value).toLocaleString('es-AR')}`
-                      : card.value}
-                  </span>
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{card.desc}</p>
-                </div>
-              </div>
-            )
-          })}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger-children">
+          {kpiCards.map(card => (
+            <AnimatedKpiCard key={card.name} card={card} />
+          ))}
         </div>
       )}
 
@@ -569,10 +598,13 @@ export default function TenantDashboard() {
             ))}
           </div>
         ) : upcomingAppointments.length === 0 ? (
-          <div className="py-10 text-center border border-dashed border-border-custom rounded-xl bg-zinc-50/50 dark:bg-primary-light/5">
-            <Sparkles className="w-8 h-8 text-primary/30 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">No hay turnos próximos</p>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">Programá nuevas citas desde la Agenda.</p>
+          <div className="border border-dashed border-border-custom rounded-xl bg-zinc-50/30 dark:bg-primary-light/5">
+            <EmptyState
+              variant="appointments"
+              title="No hay turnos próximos"
+              description="Cuando lleguen nuevas reservas aparecerán aquí. Podés agregar una cita desde la Agenda."
+              compact
+            />
           </div>
         ) : (
           <div className="overflow-x-auto">

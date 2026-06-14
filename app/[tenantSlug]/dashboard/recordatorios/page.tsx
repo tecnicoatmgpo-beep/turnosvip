@@ -7,6 +7,7 @@ import {
   Bell, MessageCircle, Check, X, Clock, RefreshCw,
   PhoneOff, Calendar, ChevronDown, ChevronUp
 } from 'lucide-react'
+import EmptyState from '@/components/EmptyState'
 
 interface Reminder {
   id: string
@@ -312,15 +313,11 @@ export default function RecordatoriosPage() {
           <Clock className="w-6 h-6 text-zinc-300 animate-spin" />
         </div>
       ) : tabData[activeTab].items.length === 0 ? (
-        <div className="text-center py-16 text-zinc-400">
-          <Bell className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">{tabData[activeTab].emptyMsg}</p>
-          {activeTab === 'pending' && (
-            <p className="text-xs mt-1 text-zinc-300 dark:text-zinc-600">
-              El sistema buscará automáticamente turnos próximos cada hora.
-            </p>
-          )}
-        </div>
+        <EmptyState
+          variant="reminders"
+          title={tabData[activeTab].emptyMsg}
+          description={activeTab === 'pending' ? 'El cron detecta turnos próximos una vez al día. Usá "Buscar ahora" para forzar la búsqueda.' : undefined}
+        />
       ) : (
         <div className="space-y-3">
           {tabData[activeTab].items.map(r => (
